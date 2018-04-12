@@ -4,7 +4,8 @@
 """
 聚类模块，包含如下功能
 1. K-means 聚类
-2. 基于字符串相似度聚类
+2  hierarchical 聚类
+3. 基于字符串相似度聚类
 """
 import os
 import sys
@@ -22,50 +23,83 @@ from logger import logger
 from config import cfg
 from vectorize import _load_vector_data, make_vectorize
 
-N_CLUSTER_RATION = cfg.N_CLUSTER_RATION
+# 并行进程数
 N_JOBS = cfg.GLOBAL_N_JOBS
+# 控制聚类的数量
+N_CLUSTER_RATION = cfg.N_CLUSTER_RATION
+# 控制字符串相似度
 EDIT_DISTANCE_THRESH_LONG = cfg.EDIT_DISTANCE_THRESH_LONG
 EDIT_DISTANCE_THRESH_SHORT = cfg.EDIT_DISTANCE_THRESH_SHORT
 LONG_URL_THRESH = cfg.LONG_URL_THRESH
 SHORT_URL_THRESH = cfg.SHORT_URL_THRESH
 
 
+# init dump cluster data
+# 由于字符串相似度聚类需要较长时间，将聚好的类顺序写入文件
 def _init_dump_cluster_data(file_path):
+    """
+    json format
+    :param file_path: cluster file path [str] 
+    :return: 
+    """
     if os.path.isfile(file_path):
         os.remove(file_path)
         logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
 
 
+# dump cluster data
+# 由于字符串相似度聚类需要较长时间，将聚好的类顺序写入文件
 def _dump_cluster_data(file_path, single_cluster, index):
+    """
+    json format
+    :param file_path: cluster file path [str]
+    :param single_cluster: single cluster [list]
+    :param index: cluster index [int]
+    :return: 
+    """
     with open(file_path, "a+") as fd:
         fd.write(json.dumps({index: single_cluster}) + '\n')
 
 
+# load k means / hierarchical cluster data
 def _load_kmeans_hier_cluster_data(file_path):
+    """
+    json format
+    :param file_path: file_path [str] 
+    :return: 
+    """
     res = []
     try:
         with open(file_path, 'r') as fd:
             res_dict = json.loads(fd.read().strip())
         for i in range(len(res_dict)):
             res.append(res_dict[str(i)])
-        logger.debug("K-means data has been loaded\t%s" % file_path)
+        logger.debug("K-means/hier data has been loaded\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\t FILE OPEN ERROR!\t%s" % (file_path, str(e)))
+        logger.error("%s\t FILE OPEN ERROR!\t%s" % (file_path, str(e)))
         sys.exit(0)
     return res
 
 
-def _dump_kmeans_hier_cluster_data(data, file_path):
+# dump k mean / hierarchical cluster data 
+def _dump_kmeans_hier_cluster_data(cluster_dict, file_path):
+    """
+    json format
+    :param cluster_dict: cluster results [dict] 
+    :param file_path: 
+    :return: 
+    """
     if os.path.isfile(file_path):
         os.remove(file_path)
         logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
     try:
         with open(file_path, 'w+') as fd:
-            fd.write(json.dumps(data))
+            fd.write(json.dumps(cluster_dict))
         logger.debug("cluster has been dump\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\tFILE DUMP ERROR! %s" % (file_path, e))
+        logger.error("%s\tFILE DUMP ERROR! %s" % (file_path, e))
         sys.exit(0)
+
 
 
 # calculate two url distance
@@ -74,7 +108,7 @@ def _core_distance_check(base_url, comp_url, metric):
     :param base_url: base url string to compare
     :param comp_url: second url string to compare with base url string
     :param metric: method use to calculate distance
-    :return: true of false whether the comp_url is similar with base url
+    :return: true of false whether the comp_url is similar with base url [bool]
     """
     if metric == "distance":
         base_thresh = 6
@@ -102,9 +136,9 @@ def make_string_distance_cluster(
         data,
         n_jobs=N_JOBS,
         metric="distance",
-        file_path=cfg.CLUSTER_DISTANCE_DATA_PATH):
+        file_path=None):
     """
-    :param data: url list[list] or k-means results file path
+    :param data: url list[list] or k-means results file path [str] 
     :param n_jobs: multi-process
     :param metric: algorithms used to metric the string distance
     :param file_path: output file
@@ -121,51 +155,59 @@ def make_string_distance_cluster(
         urls_list = _load_kmeans_hier_cluster_data(data)
     # prepare the output file
     _init_dump_cluster_data(file_path)
-    counter = 0
+    cluster_count = 0
     # url distance cluster
     for batch_index, batch_urls in enumerate(urls_list):
-        cluster = []
-        in_cluster = set()
+        cluster_list = []
+        cluster_done = set()
         # for each sub cluster of k-mean results
-        for n, i in enumerate(batch_urls):
-            if n in in_cluster:
+        for index, url in enumerate(batch_urls):
+            if index in cluster_done:
                 continue
-            logger.debug("----------------%d------------------" % n)
-            single_cluster = [i]
-            res = Parallel(n_jobs=n_jobs)(delayed(_core_distance_check)(
-                i, j, metric) for j in batch_urls[n + 1:] if j not in in_cluster)
-            for m, j in enumerate(res):
-                if j:
-                    single_cluster.append(j)
-                    in_cluster.add(n + 1 + m)
-            in_cluster.add(i)
+            logger.debug("----------------%d------------------" % index)
+            cluster = [url]
+            dis_check_list = Parallel(n_jobs=n_jobs)(delayed(_core_distance_check)(
+                url, j, metric) for j in batch_urls[index + 1:] if j not in cluster_done)
+            for dis_check_index, dis_check in enumerate(dis_check_list):
+                if dis_check:
+                    cluster.append(dis_check)
+                    cluster_done.add(index + 1 + dis_check_index)
+            cluster_done.add(url)
             # log result on console
-            for line in single_cluster:
+            for line in cluster:
                 logger.debug(str(line))
             logger.debug(
                 ">>>>>>> BATCH:%d/%d\tTOTAL:%d\tDONE:%d" %
-                (len(urls_list), batch_index + 1, len(batch_urls), len(in_cluster)))
-            cluster.append(single_cluster)
+                (len(urls_list), batch_index + 1, len(batch_urls), len(cluster_done)))
+            cluster_list.append(cluster)
             # dump result data
-            counter += 1
-            _dump_cluster_data(file_path, single_cluster, counter)
+            cluster_count += 1
+            _dump_cluster_data(file_path, cluster, cluster_count)
     logger.debug("string distance time cost:\t%f" % (time.time() - start_time))
 
 
+# make hierarchical cluster
 def make_hier_cluster(
-        data=cfg.VECTOR_DOMAIN_DATA,
-        output_path=cfg.KMEANS_CLUSTER_DATA,
+        data=None,
+        output_path=None,
         cluster_num=None,
         dump=True):
+    """
+    :param data: vector [pd.DataFrame] or vector file path [str]
+    :param output_path: [str]
+    :param cluster_num: [int]
+    :param dump: whether dump [bool]
+    :return: cluster dict [dict]
+    """
     # normalize input
     assert isinstance(data, str) or isinstance(data, pd.DataFrame)
     if isinstance(data, pd.DataFrame):
-        df = data
+        df_vector = data
     else:
-        df = _load_vector_data(data)
+        df_vector = _load_vector_data(data)
 
-    # calculate n cluster for K-means clustering
-    total_data_size = len(df)
+    # calculate n cluster for hierarchical clustering
+    total_data_size = len(df_vector)
     n_clusters = int(total_data_size / N_CLUSTER_RATION)
     if cluster_num is not None:
         n_clusters = cluster_num
@@ -174,41 +216,48 @@ def make_hier_cluster(
         "beggin to make hierarchical cluster, total_data_size: %d n_clusters: %d" %
         (total_data_size, n_clusters))
     # exception
-    if n_clusters == 0:
-        return {0: list(df.index)}
+    if n_clusters == 0 or n_clusters == 1:
+        return {0: list(df_vector.index)}
     # clustering
     clustering = AgglomerativeClustering(linkage='complete',
                                          affinity="l1",
                                          n_clusters=n_clusters,
                                          compute_full_tree=False)
-    clustering.fit(df.values)
-    df["labels"] = clustering.labels_
+    clustering.fit(df_vector.values)
+    df_vector["labels"] = clustering.labels_
 
     # dump results dict format
     res = dict()
     for i in range(n_clusters):
-        df_single = df.loc[df["labels"] == i]
-        res[i] = list(df_single.index)
+        df_single_cluster = df_vector.loc[df_vector["labels"] == i]
+        res[i] = list(df_single_cluster.index)
     logger.debug("hcluster done!")
     if dump:
         _dump_kmeans_hier_cluster_data(res, file_path=output_path)
     else:
         return res
 
-
+# make k-means cluster
 def make_kmeans_cluster(
-        data=cfg.VECTOR_DOMAIN_DATA,
-        output_path=cfg.KMEANS_CLUSTER_DATA,
+        data=None,
+        output_path=None,
         cluster_num=None,
         dump=True):
+    """
+    :param data: vector [pd.DataFrame] or vector file path [str]
+    :param output_path: [str]
+    :param cluster_num: [int]
+    :param dump: whether dump [bool]
+    :return: cluster dict [dict]
+    """
     # normalize input
     assert isinstance(data, str) or isinstance(data, pd.DataFrame)
     if isinstance(data, pd.DataFrame):
-        df = data
+        df_vector = data
     else:
-        df = _load_vector_data(data)
+        df_vector = _load_vector_data(data)
     # calculate n cluster for K-means clustering
-    total_data_size = len(df)
+    total_data_size = len(df_vector)
     n_clusters = int(total_data_size / N_CLUSTER_RATION)
     if n_clusters < 3:
         n_clusters = 10
@@ -228,8 +277,8 @@ def make_kmeans_cluster(
                 verbose=0,
                 random_state=0,
                 n_jobs=N_JOBS)
-            kmeans.fit(df.values)
-            score = metrics.calinski_harabaz_score(df.values, kmeans.labels_)
+            kmeans.fit(df_vector.values)
+            score = metrics.calinski_harabaz_score(df_vector.values, kmeans.labels_)
             calib.append(score)
             logger.debug(
                 "Calinski-Harabasz Score for\t%d Cluster K-means\t%s" %
@@ -244,13 +293,13 @@ def make_kmeans_cluster(
         verbose=0,
         random_state=0,
         n_jobs=N_JOBS)
-    kmeans.fit(df.values)
-    df["labels"] = kmeans.labels_
+    kmeans.fit(df_vector.values)
+    df_vector["labels"] = kmeans.labels_
 
     # dump results
     res = dict()
     for i in range(optimal_n_cluster):
-        df_single = df.loc[df["labels"] == i]
+        df_single = df_vector.loc[df_vector["labels"] == i]
         res[i] = list(df_single.index)
     logger.debug("k-means cluster done!")
     if dump:
@@ -259,23 +308,32 @@ def make_kmeans_cluster(
         return res
 
 
-# for mass urls training
+# for mass urls clustering
 def make_kmeans_cluster_mass(
         urls,
         domain=True,
         path=True,
         param=True,
         thresh=50000):
+    """
+    :param urls: list of urls [list]
+    :param domain:
+    :param path:
+    :param param:
+    :param thresh:
+    :return: cluster list [list]
+    """
     assert isinstance(urls, list)
+    # perform preliminary k-means cluster
     df_vector = make_vectorize(urls, domain, path, param, dump=False)
     kmeans_res_dict = make_kmeans_cluster(
         df_vector, cluster_num=int(
             len(df_vector) / thresh), dump = False)
     logger.debug("Preliminary K-means clustering complete")
     kmeans_res_list = [kmeans_res_dict[_] for _ in kmeans_res_dict]
-    # perform sub clustering for big cluster
 
-    def kmeans_round(pre_cluster_list):
+    # perform sub clustering for big cluster
+    def _core_kmeans_mass(pre_cluster_list):
         sub_cluster_list = []
         flag = 0
         for index, pre_cluster in enumerate(pre_cluster_list):
@@ -290,26 +348,36 @@ def make_kmeans_cluster_mass(
                     sub_cluster_list.append(v)
         pre_cluster_list += sub_cluster_list
         return pre_cluster_list, flag
-    kmeans_res_list, flag = kmeans_round(kmeans_res_list)
+    kmeans_res_list, flag = _core_kmeans_mass(kmeans_res_list)
     while flag != 0:
-        kmeans_res_list, flag = kmeans_round(kmeans_res_list)
+        kmeans_res_list, flag = _core_kmeans_mass(kmeans_res_list)
     return kmeans_res_list
 
 
+# for mass hierarchical cluster
 def make_hier_cluster_mass(
-        data,
+        urls_list,
         domain=True,
         path=True,
         param=True,
         output_path=None,
         dump=True):
+    """
+    :param urls_list: urls_list [list]
+    :param domain:
+    :param path:
+    :param param:
+    :param output_path:
+    :param dump:
+    :return: cluster list [list]
+    """
     hcluster_res_list = []
-    for urls in data:
+    for urls in urls_list:
         df_vector = make_vectorize(urls, domain, path, param, dump=False)
-        hres = make_hier_cluster(df_vector, dump=False)
-        for k, v in hres.iteritems():
+        hcluster_res_dict = make_hier_cluster(df_vector, dump=False)
+        for k, v in hcluster_res_dict.iteritems():
             hcluster_res_list.append(v)
-    # flter hier cluster result
+    # filter hierarchical cluster result
     _cluster_filter(hcluster_res_list)
     if dump:
         hier_cluster_res_dict = dict()
@@ -320,7 +388,13 @@ def make_hier_cluster_mass(
         return hcluster_res_list
 
 
+# clean cluster result list
 def _cluster_filter(cluster_res_list, filter_limit=1):
+    """
+    :param cluster_res_list:
+    :param filter_limit:
+    :return:
+    """
     cluster_res_list = [_ for _ in cluster_res_list if type(_) == list]
     cluster_lens = [len(_) for _ in cluster_res_list]
     logger.debug("before filter %s" % str(Counter(cluster_lens)))
@@ -329,7 +403,13 @@ def _cluster_filter(cluster_res_list, filter_limit=1):
 
 
 
+# make ip cluster
 def make_ip_cluster(ip_url_map, limit = 2):
+    """
+    :param ip_url_map:
+    :param limit:
+    :return:
+    """
     res = [[]]
     for ip in ip_url_map:
         if len(ip_url_map[ip])<=2:

@@ -26,24 +26,34 @@ from lib.max_substring import maxsubstring
 
 
 N_JOBS = cfg.GLOBAL_N_JOBS
-SMALL_CLUSTER_SIZE = cfg.SMALL_CLUSTER_SIZE
-BIG_CLUSTER_SIZE = cfg.BIG_CLUSTER_SIZE
 
+# regular expression extract
 MIN_SUBSTRING_SIZE = cfg.MIN_SUBSTRING_SIZE
 SINGLE_REGEX_SIZE = cfg.SINGLE_REGEX_SIZE
 TOTAL_REGEX_SIZE = cfg.TOTAL_REGEX_SIZE
-
 SINGLE_REGEX_SIZE_RATIO = cfg.SINGLE_REGEX_SIZE_RATIO
 TOTAL_REGEX_SIZE_RATIO = cfg.TOTAL_REGEX_SIZE_RATIO
 
+# regular expression extract
 BIG_CLUSTER_SAMPLE_ROUND = cfg.BIG_CLUSTER_SAMPLE_ROUND
+SMALL_CLUSTER_SIZE = cfg.SMALL_CLUSTER_SIZE
+BIG_CLUSTER_SIZE = cfg.BIG_CLUSTER_SIZE
 
+# regular expression  publish
 PUBLISH_FP_THRESH = cfg.PUBLISH_FP_THRESH
 PUBLISH_TP_THRESH = cfg.PUBLISH_TP_THRESH
 PUBLISH_RATIO = cfg.PUBLISH_RATIO
 PUBLISH_RATIO_TP_THRESH = cfg.PUBLISH_RATIO_TP_THRESH
 
+# load  string distance cluster data
+
+
 def _load_cluster_data(file_path):
+    """
+    json format
+    :param file_path:
+    :return: urls list [list]
+    """
     cluster = []
     try:
         with open(file_path, 'r') as fd:
@@ -51,13 +61,19 @@ def _load_cluster_data(file_path):
                 cluster.append(json.loads(line.strip()))
         logger.debug("Cluster Data has been loaded\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\t FILE OPEN ERROR! %s" % (file_path, e))
+        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, e))
         sys.exit(0)
     cluster = [_[_.keys()[0]] for _ in cluster]
     return cluster
 
+ # load regular expression data
+
 
 def _load_regex_data(file_path):
+    """
+    :param file_path:
+    :return:
+    """
     regex = []
     try:
         with open(file_path, 'r') as fd:
@@ -65,38 +81,59 @@ def _load_regex_data(file_path):
                 regex.append(line.strip().split('\t'))
         logger.debug("Regex Data has been loaded\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\t FILE OPEN ERROR! %s" % (file_path, e))
+        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, e))
         sys.exit(0)
     return regex
 
 
-def _load_test_data(file_path):
-    try:
-        df = pd.read_csv(file_path)
-        urls = list(df.url)
-        logger.debug("Test Data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.warning("%s\t FILE OPEN ERROR! %s" % (file_path, e))
-        sys.exit(0)
-    return urls
-
-
-def _dump_regex_data(file_path, regex):
+# load regular expression data
+def _dump_regex_data(file_path, regex_list):
+    """
+    :param file_path:
+    :param regex_list: [list]
+    :return:
+    """
     if os.path.isfile(file_path):
         os.remove(file_path)
         logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
     try:
         with open(file_path, 'w+') as fd:
-            for single_regex in regex:
-                fd.write("\t".join(single_regex) + '\n')
+            for regex in regex_list:
+                fd.write("\t".join(regex) + '\n')
         logger.debug("Regex has been dump\t%s" % file_path)
     except Exception as e:
         logger.warning("%s\tFILE DUMP ERROR %s" % (file_path, e))
         sys.exit(0)
 
+# load test data in csv url format
 
+
+def _load_test_data(file_path, csv=True):
+    """
+    :param file_path:
+    :return: urls [list]
+    """
+    try:
+        if csv:
+            df = pd.read_csv(file_path)
+            urls = list(df.url)
+        else:
+            with open(file_path, "r") as f:
+                urls = [_.strip() for _ in f]
+        logger.debug("Test Data has been loaded\t%s" % file_path)
+    except Exception as e:
+        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, e))
+        sys.exit(0)
+    return urls
+
+
+# convert string to regular expression
 def _regularize_string(string):
-    # transfer_mean = "$()*+.[]?\^{},|"
+    """
+    transfer_mean = "$()*+.[]?\^{},|"
+    :param string:
+    :return:
+    """
     string = string.replace("$", "\$")
     string = string.replace("(", "\(")
     string = string.replace(")", "\)")
@@ -112,7 +149,6 @@ def _regularize_string(string):
     string = string.replace(",", "\,")
     string = string.replace("|", "\|")
     return string
-
 
 
 # regular expression match
@@ -133,7 +169,6 @@ def _regex_match(regex, url):
     return False
 
 
-
 # sorting the output n max long string
 def _sorting_regex(string, regex):
     """
@@ -145,7 +180,6 @@ def _sorting_regex(string, regex):
     pair_indices_regex = [(indices[i], regex[i]) for i in range(len(regex))]
     pair_indices_regex = sorted(pair_indices_regex, key=lambda x: x[0])
     return [_[1] for _ in pair_indices_regex]
-
 
 
 # search regex in clusters
@@ -161,45 +195,50 @@ def _regex_search_engine(cluster):
         cluster = [_[:512] for _ in cluster]
     if len(cluster[0]) > 256:
         cluster = cluster[:3]
-        
-    # search part
+
+    # search part 1) max substring 2) sorting 3) size check 4) regularize
+    # 1)
     regex = maxsubstring(cluster, thresh=MIN_SUBSTRING_SIZE)
+    # 2)
     regex = _sorting_regex(cluster[0], regex)
+    # 3)
     if len(regex) == 0:
         return None
-    if len(regex) == 1 and len(regex[0]) < SINGLE_REGEX_SIZE_RATIO * len(cluster[0]) \
-                and len(regex[0]) < SINGLE_REGEX_SIZE:
+    if len(regex) == 1 and len(
+        regex[0]) < SINGLE_REGEX_SIZE_RATIO * len(
+        cluster[0]) or len(
+            regex[0]) < SINGLE_REGEX_SIZE:
         return None
     if len(regex) > 1:
         total_size = sum([len(_) for _ in regex])
-        if total_size < TOTAL_REGEX_SIZE_RATIO * len(cluster[0]) and \
+        if total_size < TOTAL_REGEX_SIZE_RATIO * len(cluster[0]) or \
                 total_size < TOTAL_REGEX_SIZE:
             return None
+    # 4)
     regex = [_regularize_string(_) for _ in regex]
     return regex
-
 
 
 # search regular expression in big cluster
 def _regex_search_in_big_cluster(cluster):
     """
-    :param cluster:  url string cluster
+    :param cluster:  url string cluster [list]
     :return: regular expression match most of the cluster
     """
     assert len(cluster) >= 2
     # sampling the big cluster and maximize match count
     random_sample_list = []
     match_count_list = []
-    regex_list = [] 
+    regex_list = []
     # prepare the sample list
     for i in range(BIG_CLUSTER_SAMPLE_ROUND):
         random_sample_list.append(
-            random.sample(cluster, int(len(cluster) / 2))) 
+            random.sample(cluster, int(len(cluster) / 2)))
     # get sample regex
     sample_regex_list = Parallel(
         n_jobs=N_JOBS)(
         delayed(_regex_search_engine)(
-        random_sample) 
+            random_sample)
         for random_sample in random_sample_list)
     # analysis the above regex
     for sample_regex in sample_regex_list:
@@ -242,10 +281,10 @@ def regex_extract(input_file_path=cfg.CLUSTER_DISTANCE_DATA_PATH,
     :return: None
     """
     start_time = time.time()
-    cluster = _load_cluster_data(input_file_path)
-    cluster_size = [len(_) for _ in cluster]
+    cluster_list = _load_cluster_data(input_file_path)
+    cluster_size = [len(_) for _ in cluster_list]
     # log detail info of cluster on console
-    logger.debug("total cluster num:\t%d" % len(cluster))
+    logger.debug("total cluster num:\t%d" % len(cluster_list))
     logger.debug("big cluster:\t%d" %
                  len([1 for i in cluster_size if i >= BIG_CLUSTER_SIZE]))
     logger.debug("small cluster:\t%d" % len(
@@ -253,26 +292,30 @@ def regex_extract(input_file_path=cfg.CLUSTER_DISTANCE_DATA_PATH,
     logger.debug("single one:\t%d" % len([1 for i in cluster_size if i == 1]))
     logger.debug("cluster size detail:\t%s" % str(Counter(cluster_size)))
     # treat different for different size of cluster
-    regex = []
-    for cluster_index, single_cluster in enumerate(cluster):
-        
-        if SMALL_CLUSTER_SIZE <= len(single_cluster) < BIG_CLUSTER_SIZE:
-            temp_regex = _regex_search_in_small_cluster(single_cluster)
-            regex.append(temp_regex)
-        if len(single_cluster) >= BIG_CLUSTER_SIZE:
-            temp_regex = _regex_search_in_big_cluster(single_cluster)
-            regex.append(temp_regex)
+    regex_list = []
+    for cluster_index, cluster in enumerate(cluster_list):
 
-    regex = [_ for _ in regex if _ is not None]
-    _dump_regex_data(output_file_path, regex)
+        if SMALL_CLUSTER_SIZE <= len(cluster) < BIG_CLUSTER_SIZE:
+            regex = _regex_search_in_small_cluster(cluster)
+            regex_list.append(regex)
+        if len(cluster) >= BIG_CLUSTER_SIZE:
+            regex = _regex_search_in_big_cluster(cluster)
+            regex_list.append(regex)
 
-    logger.debug("extract regex count:\t%d" % len(regex))
+    regex_list = [_ for _ in regex_list if _ is not None]
+    _dump_regex_data(output_file_path, regex_list)
+
+    logger.debug("extract regex count:\t%d" % len(regex_list))
     logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
 
 
-    
 # check the extracted regular expression with white list url to avoid FP
-def _check_performance(regex, benign_urls, malicious_urls, batch_index, n_jobs):
+def _check_performance(
+        regex,
+        benign_urls,
+        malicious_urls,
+        batch_index,
+        n_jobs):
     """
     split regular expression into batches for multi-process check
     :param regex: regular expressions to check [list]
@@ -304,7 +347,7 @@ def _check_performance(regex, benign_urls, malicious_urls, batch_index, n_jobs):
             malicious_res)
         res.append((benign_res, malicious_res))
     return res
- 
+
 
 def _dump_check_result(fp, tp, regex, file_path):
     if os.path.isfile(file_path):
@@ -313,11 +356,13 @@ def _dump_check_result(fp, tp, regex, file_path):
     try:
         with open(file_path, "w+") as fd:
             for i in range(len(regex)):
-                fd.write(str(fp[i])+"\t"+str(tp[i])+"\t"+"\t".join(regex[i])+"\n")
+                fd.write(str(fp[i]) + "\t" + str(tp[i]) +
+                         "\t" + "\t".join(regex[i]) + "\n")
         logger.debug("Check Result has been dump\t%s" % file_path)
     except Exception as e:
         logger.warning("%s\tFILE DUMP ERROR %s" % (file_path, e))
         sys.exit(0)
+
 
 def _load_check_result(file_path):
     try:
@@ -328,12 +373,13 @@ def _load_check_result(file_path):
                 fp_list.append(int(res[0]))
                 tp_list.append(int(res[1]))
                 regex.append(res[2:])
-        df = pd.DataFrame({"fp":fp_list, "tp":tp_list, "regex":regex})
+        df = pd.DataFrame({"fp": fp_list, "tp": tp_list, "regex": regex})
         logger.debug("check Data has been loaded\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\t FILE OPEN ERROR! %s" % (file_path, e))
+        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, e))
         sys.exit(0)
     return df
+
 
 def _dump_publish_result(res, file_path):
     if os.path.isfile(file_path):
@@ -345,17 +391,18 @@ def _dump_publish_result(res, file_path):
             lines.append("\t".join(single_regex) + '\n')
         logger.debug("Publish Result Count:\t%d" % len(lines))
         lines = list(set(lines))
-        logger.debug("Publish Result Count(remove duplicates):\t%d" % len(lines))  
+        logger.debug(
+            "Publish Result Count(remove duplicates):\t%d" %
+            len(lines))
         with open(file_path, 'w+') as fd:
             for line in lines:
                 fd.write(line)
         logger.debug("Publish Result has been dump\t%s" % file_path)
     except Exception as e:
-        logger.warning("%s\tFILE DUMP ERROR %s" % (file_path, e))
+        logger.error("%s\tFILE DUMP ERROR %s" % (file_path, e))
         sys.exit(0)
 
-        
-        
+
 # regular expression check and publish
 def regex_check(input_file_path=cfg.REGEX_DISTANCE_DATA_PATH,
                 test_benign_file_path=cfg.TEST_DATA,
@@ -387,30 +434,28 @@ def regex_check(input_file_path=cfg.REGEX_DISTANCE_DATA_PATH,
     _dump_check_result(res_fp, res_tp, regex, result_file_path)
 
 
-
 def regex_publish(result_file_path=cfg.REGEX_DISTANCE_RESULT,
                   publish_file_path=cfg.REGEX_DISTANCE_PUBLISH,
-                  publish_fp_thresh = PUBLISH_FP_THRESH,
-                  publish_tp_thresh = PUBLISH_TP_THRESH,
-                  publish_ratio = PUBLISH_RATIO,
-                  publish_ratio_tp_thresh = PUBLISH_RATIO_TP_THRESH):
+                  publish_fp_thresh=PUBLISH_FP_THRESH,
+                  publish_tp_thresh=PUBLISH_TP_THRESH,
+                  publish_ratio=PUBLISH_RATIO,
+                  publish_ratio_tp_thresh=PUBLISH_RATIO_TP_THRESH):
     df = _load_check_result(result_file_path)
     # dump regular expression with 0 fp
     df_1 = df.loc[df.fp <= publish_fp_thresh]
     df_1 = df_1.loc[df.tp >= publish_tp_thresh]
-    regex_publish = list(df_1.regex)
-    
-    df["ratio"] = (df.fp.values+1) / (df.tp.values+1)
-    df_2 = df.loc[df.ratio<publish_ratio]
-    df_2 = df_2.loc[df_2.fp<=publish_ratio_tp_thresh]
-    regex_publish += list(df_2.regex)
-    _dump_publish_result(regex_publish, publish_file_path)
-     
-        
-        
-# evaluate the regex extracted from the list        
+    regex_list_publish = list(df_1.regex)
+
+    df["ratio"] = (df.fp.values + 1) / (df.tp.values + 1)
+    df_2 = df.loc[df.ratio < publish_ratio]
+    df_2 = df_2.loc[df_2.fp <= publish_ratio_tp_thresh]
+    regex_list_publish += list(df_2.regex)
+    _dump_publish_result(regex_list_publish, publish_file_path)
+
+
+# evaluate the regex extracted from the list
 def regex_evaluate(publisth_file_path,
-             test_malicious_file_path):
+                   test_malicious_file_path):
     malicious_urls = _load_test_data(test_malicious_file_path)
     regex = _load_regex_data(publisth_file_path)
     malicious_urls_hit = set()
@@ -418,9 +463,10 @@ def regex_evaluate(publisth_file_path,
         for j in malicious_urls:
             if _regex_match(i, j):
                 malicious_urls_hit.add(j)
-    hit_percentage = float(len(malicious_urls_hit))/float(len(set(malicious_urls)))*100
-    logger.debug("hit percentage: %f" %hit_percentage)
-    
+    hit_percentage = float(len(malicious_urls_hit)) / \
+        float(len(set(malicious_urls))) * 100
+    logger.debug("hit percentage: %f" % hit_percentage)
+
 
 def _core_predict(regex, test_urls, batch_index, n_jobs):
     """
@@ -429,7 +475,7 @@ def _core_predict(regex, test_urls, batch_index, n_jobs):
     :param test_urls: white list url [list]
     :param batch_index: batch index
     :param n_jobs: n jobs for multi-process
-    :return: 
+    :return:
     """
     # decides which batch of regular expression use to check
     batch_size = int(len(regex) / n_jobs)
@@ -437,7 +483,7 @@ def _core_predict(regex, test_urls, batch_index, n_jobs):
     end_index = (batch_index + 1) * batch_size
     if batch_index == n_jobs - 1:
         end_index += n_jobs
-    
+
     # check batch regular expression with white list urls
     res = dict()
     for index, i in enumerate(regex[start_index: end_index]):
@@ -452,15 +498,16 @@ def _core_predict(regex, test_urls, batch_index, n_jobs):
             batch_index,
             "sample index",
             index,
-            "hit",len(hit)
-            )
+            "hit", len(hit)
+        )
         if len(hit) != 0:
             res["\t".join(i)] = hit
     return res
 
+
 def malicious_url_predict(input_file_path,
-                  regex_file_path, 
-                  n_jobs = N_JOBS):
+                          regex_file_path,
+                          n_jobs=N_JOBS):
     regex = _load_regex_data(regex_file_path)
     test_url = _load_test_data(input_file_path)
     # predict part
@@ -468,8 +515,8 @@ def malicious_url_predict(input_file_path,
         n_jobs=n_jobs)(
         delayed(_core_predict)(
             regex,
-            test_url, 
-            index, 
+            test_url,
+            index,
             n_jobs) for index in range(n_jobs))
     # precess the result
     predict_malicious = []
@@ -479,10 +526,3 @@ def malicious_url_predict(input_file_path,
             predict_malicious.extend(i[j])
             predict_dict[j] = i[j]
     return predict_malicious, predict_dict
-
-
-
-
-        
-        
-    
