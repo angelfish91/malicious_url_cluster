@@ -41,9 +41,13 @@ std::vector<std::string> max_substring_of_strings(std::vector<std::string> raw_s
         else{
             if(ans_len < min_char_count)
                 break;
-            results.push_back(raw_strings[0].substr(ans_st, ans_len));
-            raw_strings[0] = raw_strings[0].substr(0,ans_st) +
-                raw_strings[0].substr(ans_st + ans_len, raw_strings[0].size()- ans_st - ans_len);            
+            std::string res = raw_strings[0].substr(ans_st, ans_len);
+            results.push_back(res);
+            raw_strings[0] = raw_strings[0].substr(ans_st + ans_len, raw_strings[0].size()- ans_st - ans_len);
+            for(int i = 1; i<raw_strings.size(); i++){
+                int st = raw_strings[i].find(res);
+                raw_strings[i] = raw_strings[i].substr(st + ans_len, raw_strings[i].size()- st - ans_len);
+            }
         }
     }
     return results;

@@ -14,6 +14,7 @@ import pandas as pd
 from collections import defaultdict
 from joblib import Parallel, delayed
 import socket
+import urllib
 
 from config import cfg
 import urlnormalize
@@ -40,7 +41,7 @@ def url_map_ip_analysis(urls, n_jobs = N_JOBS):
     return ip_url_map
         
 
-def url_statistic_analysis(urls):
+def url_classify_analysis(urls):
     only_domain = set()
     url_with_path = set()
     url_with_param = set()
@@ -49,15 +50,25 @@ def url_statistic_analysis(urls):
             continue
         worker = urlnormalize.UrlNormalize(url)
         if worker.url_is_only_domain():
-            only_domain.add(url)
+            only_domain.add(woker.get_hostname())
         elif len(worker.get_params()) == 0:
             url_with_path.add(worker.get_quote_plus_url(url))
         else:
             url_with_param.add(worker.get_quote_plus_url(url))
     return list(only_domain), list(url_with_path), list(url_with_param)
 
+def url_split_analysis(urls):
+    domain = set()
+    path = set()
+    for url in urls:
+        worker = urlnormalize.UrlNormalize(url)
+        domain.add(worker.get_hostname())
+        path.add(urllib.quote_plus(worker.get_path()))
+    return domain, path
+    
 
-def url_path_statistic_analysis(urls):
+
+def url_path_analysis(urls):
     res = defaultdict(list)
     for url in urls:
         worker = urlnormalize.UrlNormalize(url)

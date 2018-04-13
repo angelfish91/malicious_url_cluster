@@ -552,8 +552,8 @@ static CYTHON_INLINE float __PYX_NAN() {
   #endif
 #endif
 
-#define __PYX_HAVE__max_substring
-#define __PYX_HAVE_API__max_substring
+#define __PYX_HAVE__lib__max_substring
+#define __PYX_HAVE_API__lib__max_substring
 #include <string.h>
 #include <string>
 #include "ios"
@@ -1026,7 +1026,7 @@ static int __Pyx_InitStrings(__Pyx_StringTabEntry *t);
 
 /* Module declarations from 'libcpp.vector' */
 
-/* Module declarations from 'max_substring' */
+/* Module declarations from 'lib.max_substring' */
 static std::string __pyx_convert_string_from_py_std__in_string(PyObject *); /*proto*/
 static CYTHON_INLINE PyObject *__pyx_convert_PyObject_string_to_py_std__in_string(std::string const &); /*proto*/
 static CYTHON_INLINE PyObject *__pyx_convert_PyUnicode_string_to_py_std__in_string(std::string const &); /*proto*/
@@ -1034,11 +1034,11 @@ static CYTHON_INLINE PyObject *__pyx_convert_PyStr_string_to_py_std__in_string(s
 static CYTHON_INLINE PyObject *__pyx_convert_PyBytes_string_to_py_std__in_string(std::string const &); /*proto*/
 static CYTHON_INLINE PyObject *__pyx_convert_PyByteArray_string_to_py_std__in_string(std::string const &); /*proto*/
 static PyObject *__pyx_convert_vector_to_py_std_3a__3a_string(const std::vector<std::string>  &); /*proto*/
-#define __Pyx_MODULE_NAME "max_substring"
-extern int __pyx_module_is_main_max_substring;
-int __pyx_module_is_main_max_substring = 0;
+#define __Pyx_MODULE_NAME "lib.max_substring"
+extern int __pyx_module_is_main_lib__max_substring;
+int __pyx_module_is_main_lib__max_substring = 0;
 
-/* Implementation of 'max_substring' */
+/* Implementation of 'lib.max_substring' */
 static PyObject *__pyx_builtin_range;
 static const char __pyx_k_i[] = "i";
 static const char __pyx_k_out[] = "out";
@@ -1049,27 +1049,27 @@ static const char __pyx_k_thresh[] = "thresh";
 static const char __pyx_k_in_list[] = "in_list";
 static const char __pyx_k_input_string[] = "input_string";
 static const char __pyx_k_maxsubstring[] = "maxsubstring";
-static const char __pyx_k_max_substring[] = "max_substring";
+static const char __pyx_k_lib_max_substring[] = "lib.max_substring";
 static const char __pyx_k_max_substring_pyx[] = "max_substring.pyx";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_i;
 static PyObject *__pyx_n_s_in_list;
 static PyObject *__pyx_n_s_input_string;
+static PyObject *__pyx_n_s_lib_max_substring;
 static PyObject *__pyx_n_s_main;
-static PyObject *__pyx_n_s_max_substring;
 static PyObject *__pyx_kp_s_max_substring_pyx;
 static PyObject *__pyx_n_s_maxsubstring;
 static PyObject *__pyx_n_s_out;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_test;
 static PyObject *__pyx_n_s_thresh;
-static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_in_list, PyObject *__pyx_v_thresh); /* proto */
+static PyObject *__pyx_pf_3lib_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_in_list, PyObject *__pyx_v_thresh); /* proto */
 static PyObject *__pyx_int_4;
 static PyObject *__pyx_tuple_;
 static PyObject *__pyx_codeobj__2;
 
-/* "max_substring.pyx":8
+/* "lib/max_substring.pyx":8
  *     extern vector[string] max_substring_of_strings(vector[string] raw_strings, int min_char_count)
  * 
  * def maxsubstring(in_list, thresh = 4):             # <<<<<<<<<<<<<<
@@ -1078,9 +1078,9 @@ static PyObject *__pyx_codeobj__2;
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_13max_substring_1maxsubstring(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static PyMethodDef __pyx_mdef_13max_substring_1maxsubstring = {"maxsubstring", (PyCFunction)__pyx_pw_13max_substring_1maxsubstring, METH_VARARGS|METH_KEYWORDS, 0};
-static PyObject *__pyx_pw_13max_substring_1maxsubstring(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_3lib_13max_substring_1maxsubstring(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static PyMethodDef __pyx_mdef_3lib_13max_substring_1maxsubstring = {"maxsubstring", (PyCFunction)__pyx_pw_3lib_13max_substring_1maxsubstring, METH_VARARGS|METH_KEYWORDS, 0};
+static PyObject *__pyx_pw_3lib_13max_substring_1maxsubstring(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyObject *__pyx_v_in_list = 0;
   PyObject *__pyx_v_thresh = 0;
   PyObject *__pyx_r = 0;
@@ -1132,18 +1132,18 @@ static PyObject *__pyx_pw_13max_substring_1maxsubstring(PyObject *__pyx_self, Py
   __pyx_L5_argtuple_error:;
   __Pyx_RaiseArgtupleInvalid("maxsubstring", 0, 1, 2, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 8, __pyx_L3_error)
   __pyx_L3_error:;
-  __Pyx_AddTraceback("max_substring.maxsubstring", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("lib.max_substring.maxsubstring", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  __pyx_r = __pyx_pf_13max_substring_maxsubstring(__pyx_self, __pyx_v_in_list, __pyx_v_thresh);
+  __pyx_r = __pyx_pf_3lib_13max_substring_maxsubstring(__pyx_self, __pyx_v_in_list, __pyx_v_thresh);
 
   /* function exit code */
   __Pyx_RefNannyFinishContext();
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_in_list, PyObject *__pyx_v_thresh) {
+static PyObject *__pyx_pf_3lib_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *__pyx_self, PyObject *__pyx_v_in_list, PyObject *__pyx_v_thresh) {
   std::vector<std::string>  __pyx_v_input_string;
   PyObject *__pyx_v_i = NULL;
   std::vector<std::string>  __pyx_v_out;
@@ -1158,7 +1158,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   int __pyx_t_7;
   __Pyx_RefNannySetupContext("maxsubstring", 0);
 
-  /* "max_substring.pyx":9
+  /* "lib/max_substring.pyx":9
  * 
  * def maxsubstring(in_list, thresh = 4):
  *     assert type(in_list) == list             # <<<<<<<<<<<<<<
@@ -1177,7 +1177,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   }
   #endif
 
-  /* "max_substring.pyx":10
+  /* "lib/max_substring.pyx":10
  * def maxsubstring(in_list, thresh = 4):
  *     assert type(in_list) == list
  *     assert type(thresh) == int             # <<<<<<<<<<<<<<
@@ -1196,7 +1196,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   }
   #endif
 
-  /* "max_substring.pyx":12
+  /* "lib/max_substring.pyx":12
  *     assert type(thresh) == int
  *     cdef vector[string] input_string
  *     for i in in_list:             # <<<<<<<<<<<<<<
@@ -1245,7 +1245,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
     __Pyx_XDECREF_SET(__pyx_v_i, __pyx_t_5);
     __pyx_t_5 = 0;
 
-    /* "max_substring.pyx":13
+    /* "lib/max_substring.pyx":13
  *     cdef vector[string] input_string
  *     for i in in_list:
  *         input_string.push_back(i)             # <<<<<<<<<<<<<<
@@ -1260,7 +1260,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
       __PYX_ERR(0, 13, __pyx_L1_error)
     }
 
-    /* "max_substring.pyx":12
+    /* "lib/max_substring.pyx":12
  *     assert type(thresh) == int
  *     cdef vector[string] input_string
  *     for i in in_list:             # <<<<<<<<<<<<<<
@@ -1270,7 +1270,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "max_substring.pyx":15
+  /* "lib/max_substring.pyx":15
  *         input_string.push_back(i)
  * 
  *     out = max_substring_of_strings(input_string, thresh)             # <<<<<<<<<<<<<<
@@ -1279,7 +1279,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_v_thresh); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 15, __pyx_L1_error)
   __pyx_v_out = max_substring_of_strings(__pyx_v_input_string, __pyx_t_7);
 
-  /* "max_substring.pyx":16
+  /* "lib/max_substring.pyx":16
  * 
  *     out = max_substring_of_strings(input_string, thresh)
  *     return out             # <<<<<<<<<<<<<<
@@ -1291,7 +1291,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "max_substring.pyx":8
+  /* "lib/max_substring.pyx":8
  *     extern vector[string] max_substring_of_strings(vector[string] raw_strings, int min_char_count)
  * 
  * def maxsubstring(in_list, thresh = 4):             # <<<<<<<<<<<<<<
@@ -1303,7 +1303,7 @@ static PyObject *__pyx_pf_13max_substring_maxsubstring(CYTHON_UNUSED PyObject *_
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_XDECREF(__pyx_t_5);
-  __Pyx_AddTraceback("max_substring.maxsubstring", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("lib.max_substring.maxsubstring", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
   __Pyx_XDECREF(__pyx_v_i);
@@ -1700,8 +1700,8 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_i, __pyx_k_i, sizeof(__pyx_k_i), 0, 0, 1, 1},
   {&__pyx_n_s_in_list, __pyx_k_in_list, sizeof(__pyx_k_in_list), 0, 0, 1, 1},
   {&__pyx_n_s_input_string, __pyx_k_input_string, sizeof(__pyx_k_input_string), 0, 0, 1, 1},
+  {&__pyx_n_s_lib_max_substring, __pyx_k_lib_max_substring, sizeof(__pyx_k_lib_max_substring), 0, 0, 1, 1},
   {&__pyx_n_s_main, __pyx_k_main, sizeof(__pyx_k_main), 0, 0, 1, 1},
-  {&__pyx_n_s_max_substring, __pyx_k_max_substring, sizeof(__pyx_k_max_substring), 0, 0, 1, 1},
   {&__pyx_kp_s_max_substring_pyx, __pyx_k_max_substring_pyx, sizeof(__pyx_k_max_substring_pyx), 0, 0, 1, 0},
   {&__pyx_n_s_maxsubstring, __pyx_k_maxsubstring, sizeof(__pyx_k_maxsubstring), 0, 0, 1, 1},
   {&__pyx_n_s_out, __pyx_k_out, sizeof(__pyx_k_out), 0, 0, 1, 1},
@@ -1721,7 +1721,7 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "max_substring.pyx":8
+  /* "lib/max_substring.pyx":8
  *     extern vector[string] max_substring_of_strings(vector[string] raw_strings, int min_char_count)
  * 
  * def maxsubstring(in_list, thresh = 4):             # <<<<<<<<<<<<<<
@@ -1865,14 +1865,14 @@ static int __pyx_pymod_exec_max_substring(PyObject *__pyx_pyinit_module)
   #if PY_MAJOR_VERSION < 3 && (__PYX_DEFAULT_STRING_ENCODING_IS_ASCII || __PYX_DEFAULT_STRING_ENCODING_IS_DEFAULT)
   if (__Pyx_init_sys_getdefaultencoding_params() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
-  if (__pyx_module_is_main_max_substring) {
+  if (__pyx_module_is_main_lib__max_substring) {
     if (PyObject_SetAttrString(__pyx_m, "__name__", __pyx_n_s_main) < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   #if PY_MAJOR_VERSION >= 3
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "max_substring")) {
-      if (unlikely(PyDict_SetItemString(modules, "max_substring", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "lib.max_substring")) {
+      if (unlikely(PyDict_SetItemString(modules, "lib.max_substring", __pyx_m) < 0)) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   #endif
@@ -1892,19 +1892,19 @@ static int __pyx_pymod_exec_max_substring(PyObject *__pyx_pyinit_module)
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "max_substring.pyx":8
+  /* "lib/max_substring.pyx":8
  *     extern vector[string] max_substring_of_strings(vector[string] raw_strings, int min_char_count)
  * 
  * def maxsubstring(in_list, thresh = 4):             # <<<<<<<<<<<<<<
  *     assert type(in_list) == list
  *     assert type(thresh) == int
  */
-  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_13max_substring_1maxsubstring, NULL, __pyx_n_s_max_substring); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 8, __pyx_L1_error)
+  __pyx_t_1 = PyCFunction_NewEx(&__pyx_mdef_3lib_13max_substring_1maxsubstring, NULL, __pyx_n_s_lib_max_substring); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 8, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_maxsubstring, __pyx_t_1) < 0) __PYX_ERR(0, 8, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "max_substring.pyx":1
+  /* "lib/max_substring.pyx":1
  * cimport cython             # <<<<<<<<<<<<<<
  * from libcpp.string cimport string
  * from libcpp.vector cimport vector
@@ -1929,11 +1929,11 @@ static int __pyx_pymod_exec_max_substring(PyObject *__pyx_pyinit_module)
   __Pyx_XDECREF(__pyx_t_1);
   if (__pyx_m) {
     if (__pyx_d) {
-      __Pyx_AddTraceback("init max_substring", 0, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init lib.max_substring", 0, __pyx_lineno, __pyx_filename);
     }
     Py_DECREF(__pyx_m); __pyx_m = 0;
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init max_substring");
+    PyErr_SetString(PyExc_ImportError, "init lib.max_substring");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();

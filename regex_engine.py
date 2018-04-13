@@ -164,19 +164,23 @@ def _regex_match(regex, url):
         return True
 
 
-# sorting the output n max long string
-def _sorting_regex(string, regex):
-    """
-    :param string: string in clusters
-    :param regex: output n max long string
-    :return: sorted regular expression
-    """
-    indices = [string.find(_) for _ in regex]
-    pair_indices_regex = [(indices[i], regex[i]) for i in range(len(regex))]
-    pair_indices_regex = sorted(pair_indices_regex, key=lambda x: x[0])
-    return [_[1] for _ in pair_indices_regex]
+# replace contine num in hostname
+def _continue_num_regex(url, regex):
 
-
+    # port subsitude
+    regex_list = regex.split("/")
+    netloc = regex_list[0]
+    pattern = re.compile(netloc)
+    if pattern.search(url.split("/")[0]) is None:
+        return regex
+    port = r":[0-9]{2,}"
+    port_f = re.compile(port).search(netloc)
+    if port_f is not None:
+        netloc = netloc.replace(netloc[port_f.span()[0]:port_f.span()[1]], port)
+        regex_list[0] = netloc
+    return "/".join(regex_list)
+        
+    
 # search regex in clusters
 def _regex_search_engine(cluster):
     """
@@ -191,12 +195,9 @@ def _regex_search_engine(cluster):
     if len(cluster[0]) > 256:
         cluster = cluster[:3]
 
-    # search part 1) max substring 2) sorting 3) size check 4) regularize
-    # 1)
+    # 1) search for max substring
     regex = maxsubstring(cluster, thresh=MIN_SUBSTRING_SIZE)
-    # 2)
-    regex = _sorting_regex(cluster[0], regex)
-    # 3)
+    # 2) size check
     if len(regex) == 0:
         return None
     if len(regex) == 1 and len(
@@ -209,9 +210,11 @@ def _regex_search_engine(cluster):
         if total_size < TOTAL_REGEX_SIZE_RATIO * len(cluster[0]) or \
                 total_size < TOTAL_REGEX_SIZE:
             return None
-    # 4)
+    # 3) regularize
     regex = [_regularize_string(_) for _ in regex]
     regex = "(.)+".join(regex)
+    # 4) sub continue digit in hostname
+    regex = _continue_num_regex(cluster[0], regex)
     return regex
 
 
@@ -434,11 +437,15 @@ def regex_publish(result_file_path,
     dfa = dfa.loc[df.tp >= publish_tp_thresh]
     regex_list_publish = list(dfa.regex)
 
-    df["ratio"] = (df.fp.values + 1) / (df.tp.values + 1)
+    df["ratio"] = (df.fp + 1) / (df.tp + 1)
     dfb = df.loc[df.ratio < publish_ratio]
     dfb = dfb.loc[dfb.fp <= publish_ratio_tp_thresh]
     regex_list_publish += list(dfb.regex)
+    regex_list_publish = list(set(regex_list_publish))
+    logger.debug("regular expression publish\t%d" %len(regex_list_publish))
+    # dump regular expressions
     _dump_regex_list(regex_list_publish, publish_file_path)
+    return dfa, dfb
 
 
 # evaluate the regex extracted from the list
@@ -477,9 +484,7 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
     for index, i in enumerate(regex_list[start_index: end_index]):
         hit = []
         for url in test_urls:
-            worker = UrlNormalize(url)
-            url_plus = worker.get_quote_plus_url()
-            if _regex_match(i, url_plus):
+            if _regex_match(i, url):
                 hit.append(url)
         print(
             "batch index",
@@ -489,7 +494,7 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
             "hit", len(hit)
         )
         if len(hit) != 0:
-            res["\t".join(i)] = hit
+            res[i] = hit
     return res
 
 
@@ -504,13 +509,19 @@ def malicious_url_predict(input_file_path,
     :return: predict_malicious [list], predict_dict [dict]
     """
     regex = _load_regex_list(regex_file_path)
-    test_url = _load_test_data(input_file_path)
+    test_urls = _load_test_data(input_file_path)
+    # preprocess
+    test_urls_map = dict()
+    for url in test_urls:
+        worker = UrlNormalize(url)
+        test_urls_map[worker.get_quote_plus_url(url)] = url    
+    
     # predict part
     predict_res = Parallel(
         n_jobs=n_jobs)(
         delayed(_core_predict)(
             regex,
-            test_url,
+            test_urls_map.keys(),
             index,
             n_jobs) for index in range(n_jobs))
     # precess the result
@@ -520,4 +531,9 @@ def malicious_url_predict(input_file_path,
         for j in i:
             predict_malicious.extend(i[j])
             predict_dict[j] = i[j]
-    return predict_malicious, predict_dict
+    
+    predict_malicious = list(set([test_urls_map[_] for _ in predict_malicious]))
+    predict_dict_final = dict()
+    for k, v in predict_dict.iteritems():
+        predict_dict_final[k] = [test_urls_map[_] for _ in v]
+    return predict_malicious, predict_dict_final
