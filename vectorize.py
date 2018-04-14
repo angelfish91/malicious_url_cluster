@@ -4,51 +4,15 @@
 """
 向量化URL
 """
-import os
-import sys
 import numpy as np
 import pandas as pd
 from logger import logger
 
 from config import cfg
 import urlnormalize
-
+from io import _dump_vector_data
 
 ASCII_SIZE = cfg.ASCII_SIZE
-
-
-# dump vector data
-def _dump_vector_data(file_path, df_vector):
-    """
-    :param file_path: file_path [str]
-    :param df_vector: vector [pd.DataFrame]
-    :return:
-    """
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-    try:
-        df_vector.to_csv(file_path)
-        logger.debug("vector has beeen dump\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\tFILE DUMP ERROR! %s" % (file_path, e))
-        sys.exit(0)
-
-
-# load vector data
-def _load_vector_data(file_path):
-    """
-    load vector data in csv format
-    :param file_path: file_path [str]
-    :return:
-    """
-    try:
-        df = pd.read_csv(file_path, index_col='url')
-        logger.debug("vector data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, e))
-        sys.exit(0)
-    return df
 
 
 # vectorize
@@ -58,10 +22,8 @@ def _core_vectorize(url):
     try:
         for char in url:
             # 不考虑超过128的ascii的特殊字符
-            try:
+            if ord(char) < 128:
                 res[0][ord(char)] += 1
-            except Exception as e:
-                pass
     except Exception as e:
         logger.error("VECTORIZED ERROR\t%s\t%s" % (url, str(e)))
     return res

@@ -7,10 +7,7 @@
 2  hierarchical 聚类
 3. 基于字符串相似度聚类
 """
-import os
-import sys
 import time
-import json
 import pandas as pd
 import Levenshtein as ls
 from collections import Counter
@@ -21,7 +18,10 @@ from sklearn import metrics
 
 from logger import logger
 from config import cfg
-from vectorize import _load_vector_data, make_vectorize
+from vectorize import make_vectorize
+from io import _load_vector_data, _init_dump_cluster_data, \
+    _dump_cluster_data, _load_kmeans_hier_cluster_data, \
+    _dump_kmeans_hier_cluster_data
 
 # 并行进程数
 N_JOBS = cfg.GLOBAL_N_JOBS
@@ -32,74 +32,6 @@ EDIT_DISTANCE_THRESH_LONG = cfg.EDIT_DISTANCE_THRESH_LONG
 EDIT_DISTANCE_THRESH_SHORT = cfg.EDIT_DISTANCE_THRESH_SHORT
 LONG_URL_THRESH = cfg.LONG_URL_THRESH
 SHORT_URL_THRESH = cfg.SHORT_URL_THRESH
-
-
-# init dump cluster data
-# 由于字符串相似度聚类需要较长时间，将聚好的类顺序写入文件
-def _init_dump_cluster_data(file_path):
-    """
-    json format
-    :param file_path: cluster file path [str] 
-    :return: 
-    """
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-
-
-# dump cluster data
-# 由于字符串相似度聚类需要较长时间，将聚好的类顺序写入文件
-def _dump_cluster_data(file_path, single_cluster, index):
-    """
-    json format
-    :param file_path: cluster file path [str]
-    :param single_cluster: single cluster [list]
-    :param index: cluster index [int]
-    :return: 
-    """
-    with open(file_path, "a+") as fd:
-        fd.write(json.dumps({index: single_cluster}) + '\n')
-
-
-# load k means / hierarchical cluster data
-def _load_kmeans_hier_cluster_data(file_path):
-    """
-    json format
-    :param file_path: file_path [str] 
-    :return: 
-    """
-    res = []
-    try:
-        with open(file_path, 'r') as fd:
-            res_dict = json.loads(fd.read().strip())
-        for i in range(len(res_dict)):
-            res.append(res_dict[str(i)])
-        logger.debug("K-means/hier data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR!\t%s" % (file_path, str(e)))
-        sys.exit(0)
-    return res
-
-
-# dump k mean / hierarchical cluster data 
-def _dump_kmeans_hier_cluster_data(cluster_dict, file_path):
-    """
-    json format
-    :param cluster_dict: cluster results [dict] 
-    :param file_path: 
-    :return: 
-    """
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-    try:
-        with open(file_path, 'w+') as fd:
-            fd.write(json.dumps(cluster_dict))
-        logger.debug("cluster has been dump\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\tFILE DUMP ERROR! %s" % (file_path, e))
-        sys.exit(0)
-
 
 
 # calculate two url distance
@@ -138,7 +70,7 @@ def make_string_distance_cluster(
         metric="distance",
         file_path=None):
     """
-    :param data: url list[list] or k-means results file path [str] 
+    :param data: url list[list] or k-means results file path [str]
     :param n_jobs: multi-process
     :param metric: algorithms used to metric the string distance
     :param file_path: output file
@@ -237,6 +169,7 @@ def make_hier_cluster(
     else:
         return res
 
+
 # make k-means cluster
 def make_kmeans_cluster(
         data=None,
@@ -278,7 +211,8 @@ def make_kmeans_cluster(
                 random_state=0,
                 n_jobs=N_JOBS)
             kmeans.fit(df_vector.values)
-            score = metrics.calinski_harabaz_score(df_vector.values, kmeans.labels_)
+            score = metrics.calinski_harabaz_score(
+                df_vector.values, kmeans.labels_)
             calib.append(score)
             logger.debug(
                 "Calinski-Harabasz Score for\t%d Cluster K-means\t%s" %
@@ -328,7 +262,7 @@ def make_kmeans_cluster_mass(
     df_vector = make_vectorize(urls, domain, path, param, dump=False)
     kmeans_res_dict = make_kmeans_cluster(
         df_vector, cluster_num=int(
-            len(df_vector) / thresh), dump = False)
+            len(df_vector) / thresh), dump=False)
     logger.debug("Preliminary K-means clustering complete")
     kmeans_res_list = [kmeans_res_dict[_] for _ in kmeans_res_dict]
 
@@ -395,29 +329,26 @@ def _cluster_filter(cluster_res_list, filter_limit=1):
     :param filter_limit:
     :return:
     """
-    cluster_res_list = [_ for _ in cluster_res_list if type(_) == list]
+    cluster_res_list = [_ for _ in cluster_res_list if isinstance(_, list)]
     cluster_lens = [len(_) for _ in cluster_res_list]
     logger.debug("before filter %s" % str(Counter(cluster_lens)))
     cluster_res_list = [_ for _ in cluster_res_list if len(_) <= filter_limit]
     return cluster_res_list
 
 
-
 # make ip cluster
-def make_ip_cluster(ip_url_map, limit = 2):
+def make_ip_cluster(ip_url_map, limit=2):
     """
     :param ip_url_map:
     :param limit:
-    :return:
+    :return: list of cluster [list]
     """
     res = [[]]
     for ip in ip_url_map:
-        if len(ip_url_map[ip])<=2:
+        if len(ip_url_map[ip]) <= 2:
             res[0].extend(ip_url_map[ip])
         else:
             res.append(ip_url_map[ip])
-    if len(res[0])<=limit:
+    if len(res[0]) <= limit:
         res.pop(0)
     return res
-    
-

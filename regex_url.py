@@ -11,7 +11,6 @@
 import os
 import sys
 import re
-import json
 import time
 import random
 import pandas as pd
@@ -23,7 +22,8 @@ from urlnormalize import UrlNormalize
 from logger import logger
 from config import cfg
 from lib.max_substring import maxsubstring
-
+from io import _load_cluster_data, _load_regex_list, _dump_regex_list, _load_test_data, \
+    _dump_check_result, _load_check_result
 
 N_JOBS = cfg.GLOBAL_N_JOBS
 
@@ -44,85 +44,6 @@ PUBLISH_FP_THRESH = cfg.PUBLISH_FP_THRESH
 PUBLISH_TP_THRESH = cfg.PUBLISH_TP_THRESH
 PUBLISH_RATIO = cfg.PUBLISH_RATIO
 PUBLISH_RATIO_TP_THRESH = cfg.PUBLISH_RATIO_TP_THRESH
-
-# load  string distance cluster data
-
-
-def _load_cluster_data(file_path):
-    """
-    json format
-    :param file_path:
-    :return: urls list [list]
-    """
-    cluster = []
-    try:
-        with open(file_path, 'r') as fd:
-            for line in fd:
-                cluster.append(json.loads(line.strip()))
-        logger.debug("Cluster Data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, str(e)))
-        sys.exit(0)
-    cluster = [_[_.keys()[0]] for _ in cluster]
-    return cluster
-
-
-# load regular expression data
-def _load_regex_list(file_path):
-    """
-    :param file_path:
-    :return:
-    """
-    regex = []
-    try:
-        with open(file_path, 'r') as fd:
-            for line in fd:
-                regex.append(line.strip())
-        logger.debug("Regex Data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, str(e)))
-        sys.exit(0)
-    return regex
-
-
-# load regular expression data
-def _dump_regex_list(regex_list, file_path):
-    """
-    :param file_path:
-    :param regex_list: [list]
-    :return:
-    """
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-    try:
-        with open(file_path, 'w+') as fd:
-            for regex in regex_list:
-                fd.write(regex + '\n')
-        logger.debug("Regex has been dump\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\tFILE DUMP ERROR %s" % (file_path, str(e)))
-        sys.exit(0)
-
-
-# load test data in csv url format
-def _load_test_data(file_path, csv=True):
-    """
-    :param file_path:
-    :return: urls [list]
-    """
-    try:
-        if csv:
-            df = pd.read_csv(file_path)
-            urls = list(df.url)
-        else:
-            with open(file_path, "r") as f:
-                urls = [_.strip() for _ in f]
-        logger.debug("Test Data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, str(e)))
-        sys.exit(0)
-    return urls
 
 
 # convert string to regular expression
@@ -150,7 +71,7 @@ def _regularize_string(string):
 
 
 # regular expression match
-def _regex_match(regex, url):
+def _url_regex_match(regex, url):
     """
     :param regex: input regular expression
     :param url: input url
@@ -176,11 +97,12 @@ def _continue_num_regex(url, regex):
     port = r":[0-9]{2,}"
     port_f = re.compile(port).search(netloc)
     if port_f is not None:
-        netloc = netloc.replace(netloc[port_f.span()[0]:port_f.span()[1]], port)
+        netloc = netloc.replace(
+            netloc[port_f.span()[0]:port_f.span()[1]], port)
         regex_list[0] = netloc
     return "/".join(regex_list)
-        
-    
+
+
 # search regex in clusters
 def _regex_search_engine(cluster):
     """
@@ -244,7 +166,7 @@ def _regex_search_in_big_cluster(cluster):
         if sample_regex is None:
             continue
         match_count_list.append(
-            sum([_regex_match(sample_regex, _) for _ in cluster]))
+            sum([_url_regex_match(sample_regex, _) for _ in cluster]))
         regex_list.append(sample_regex)
     if len(match_count_list) == 0:
         return None
@@ -273,10 +195,11 @@ def _regex_search_in_small_cluster(cluster):
 
 # extract regular expression form small clusters
 def regex_extract(input_file_path,
-                  output_file_path, dump = True):
+                  output_file_path, dump=True):
     """
     :param input_file_path: cluster file path
     :param output_file_path: regular expression file path
+    :param dump: whether dump
     :return: None
     """
     start_time = time.time()
@@ -305,12 +228,12 @@ def regex_extract(input_file_path,
     regex_list = list(set(regex_list))
     logger.debug("extract regex count:\t%d" % len(regex_list))
     logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
-    
+
     if dump:
         _dump_regex_list(regex_list, output_file_path)
     else:
         return regex_list
-    
+
 
 # check the extracted regular expression with white list url to avoid FP
 def _check_performance(
@@ -337,8 +260,9 @@ def _check_performance(
     res = []
     # check batch regular expression with white list urls
     for index, regex in enumerate(regex_list[start_index: end_index]):
-        benign_res = sum([_regex_match(regex, _) for _ in benign_urls])
-        malicious_res = sum([_regex_match(regex, _) for _ in malicious_urls])
+        benign_res = sum([_url_regex_match(regex, _) for _ in benign_urls])
+        malicious_res = sum([_url_regex_match(regex, _)
+                             for _ in malicious_urls])
         print(
             "batch index",
             batch_index,
@@ -352,67 +276,35 @@ def _check_performance(
     return res
 
 
-# dump check result
-def _dump_check_result(fp, tp, regex_list, file_path):
-    """
-    :param fp: [list]
-    :param tp: [list]
-    :param regex_list: [list]
-    :param file_path:  [str]
-    :return:
-    """
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-    try:
-        with open(file_path, "w+") as fd:
-            for i in range(len(regex_list)):
-                fd.write(str(fp[i]) + "\t" + str(tp[i]) +
-                         "\t" + regex_list[i] + "\n")
-        logger.debug("Check Result has been dump\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\tFILE DUMP ERROR %s" % (file_path, str(e)))
-        sys.exit(0)
-
-
-# load check result
-def _load_check_result(file_path):
-    """
-    :param file_path:
-    :return:
-    """
-    try:
-        fp_list, tp_list, regex_list = [], [], []
-        with open(file_path, "r") as fd:
-            for line in fd:
-                res = line.strip().split("\t")
-                fp_list.append(int(res[0]))
-                tp_list.append(int(res[1]))
-                regex_list.append(res[2])
-        df = pd.DataFrame({"fp": fp_list, "tp": tp_list, "regex": regex_list})
-        logger.debug("check Data has been loaded\t%s" % file_path)
-    except Exception as e:
-        logger.error("%s\t FILE OPEN ERROR! %s" % (file_path, str(e)))
-        sys.exit(0)
-    return df
-
-
 # regular expression check and publish
-def regex_check(input_file_path,
-                test_benign_file_path,
-                test_malicious_file_path,
-                result_file_path,
-                n_jobs=N_JOBS):
+def url_regex_check(input_file_path,
+                    test_benign_file_path,
+                    test_malicious_file_path,
+                    result_file_path,
+                    n_jobs=N_JOBS):
+    """
+    :param input_file_path:
+    :param test_benign_file_path:
+    :param test_malicious_file_path:
+    :param result_file_path:
+    :param n_jobs:
+    :return:
+    """
 
     regex = _load_regex_list(input_file_path)
     benign_urls = _load_test_data(test_benign_file_path)
     malicious_urls = _load_test_data(test_malicious_file_path)
 
+    benign_urls_plus = []
+    for url in benign_urls:
+        worker = UrlNormalize(url)
+        benign_urls_plus.append(worker.get_domain_path_url())
+
     temp_res = Parallel(
         n_jobs=n_jobs)(
         delayed(_check_performance)(
             regex,
-            benign_urls,
+            benign_urls_plus,
             malicious_urls,
             batch_index,
             n_jobs) for batch_index in range(n_jobs))
@@ -434,6 +326,15 @@ def regex_publish(result_file_path,
                   publish_tp_thresh=PUBLISH_TP_THRESH,
                   publish_ratio=PUBLISH_RATIO,
                   publish_ratio_tp_thresh=PUBLISH_RATIO_TP_THRESH):
+    """
+    :param result_file_path: regex fp tp result file path
+    :param publish_file_path: final publish regex file path
+    :param publish_fp_thresh:
+    :param publish_tp_thresh:
+    :param publish_ratio:
+    :param publish_ratio_tp_thresh:
+    :return:
+    """
     df = _load_check_result(result_file_path)
     # dump regular expression with 0 fp
     dfa = df.loc[df.fp <= publish_fp_thresh]
@@ -445,10 +346,9 @@ def regex_publish(result_file_path,
     dfb = dfb.loc[dfb.fp <= publish_ratio_tp_thresh]
     regex_list_publish += list(dfb.regex)
     regex_list_publish = list(set(regex_list_publish))
-    logger.debug("regular expression publish\t%d" %len(regex_list_publish))
+    logger.debug("regular expression publish\t%d" % len(regex_list_publish))
     # dump regular expressions
     _dump_regex_list(regex_list_publish, publish_file_path)
-    return dfa, dfb
 
 
 # evaluate the regex extracted from the list
@@ -459,13 +359,14 @@ def regex_evaluate(publish_file_path,
     malicious_urls_hit = set()
     for index, regex in enumerate(regex_list):
         for url in malicious_urls:
-            if _regex_match(regex, url):
+            if _url_regex_match(regex, url):
                 malicious_urls_hit.add(url)
     hit_percentage = float(len(malicious_urls_hit)) / \
         float(len(set(malicious_urls))) * 100
     logger.debug("hit percentage: %f" % hit_percentage)
 
 
+# support function for malicious_url_predict
 def _core_predict(regex_list, test_urls, batch_index, n_jobs):
     """
     split regular expression into batches for multi-process check
@@ -484,10 +385,10 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
 
     # check batch regular expression with white list urls
     res = dict()
-    for index, i in enumerate(regex_list[start_index: end_index]):
+    for index, regex in enumerate(regex_list[start_index: end_index]):
         hit = []
         for url in test_urls:
-            if _regex_match(i, url):
+            if _url_regex_match(regex, url):
                 hit.append(url)
         print(
             "batch index",
@@ -497,7 +398,7 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
             "hit", len(hit)
         )
         if len(hit) != 0:
-            res[i] = hit
+            res[regex] = hit
     return res
 
 
@@ -517,10 +418,10 @@ def malicious_url_predict(input_file_path,
     test_urls_map = dict()
     for url in test_urls:
         worker = UrlNormalize(url)
-        test_urls_map[worker.get_quote_plus_url(url)] = url    
-    
+        test_urls_map[worker.get_domain_path_url()] = url
+
     # predict part
-    predict_res = Parallel(
+    predict_res_list = Parallel(
         n_jobs=n_jobs)(
         delayed(_core_predict)(
             regex,
@@ -530,12 +431,13 @@ def malicious_url_predict(input_file_path,
     # precess the result
     predict_malicious = []
     predict_dict = dict()
-    for i in predict_res:
-        for j in i:
-            predict_malicious.extend(i[j])
-            predict_dict[j] = i[j]
-    
-    predict_malicious = list(set([test_urls_map[_] for _ in predict_malicious]))
+    for predict_res in predict_res_list:
+        for key in predict_res:
+            predict_malicious.extend(predict_res[key])
+            predict_dict[key] = predict_res[key]
+
+    predict_malicious = list(set([test_urls_map[_]
+                                  for _ in predict_malicious]))
     predict_dict_final = dict()
     for k, v in predict_dict.iteritems():
         predict_dict_final[k] = [test_urls_map[_] for _ in v]

@@ -3,18 +3,12 @@
 
 """
 URL数据统计与预处理模块
-数据统计
-1. 纯为域名的url
-2. 拥有path的url
-3. 带参数的url
 """
-import os
-import sys
-import pandas as pd
-from collections import defaultdict
-from joblib import Parallel, delayed
 import socket
 import urllib
+from collections import defaultdict
+from joblib import Parallel, delayed
+
 
 from config import cfg
 import urlnormalize
@@ -22,61 +16,83 @@ from logger import logger
 
 N_JOBS = cfg.GLOBAL_N_JOBS
 
+
+# support function for make_ip_url_map
 def _core_get_ip(url):
+    """
+    :param url:
+    :return:
+    """
     worker = urlnormalize.UrlNormalize(url)
     domain = worker.get_hostname()
-    url_plus = worker.get_quote_plus_url(url)       
+    url_plus = worker.get_quote_plus_url()
     try:
         ip = socket.gethostbyname(domain)
-    except:
+    except Exception as e:
+        logger.warning("%s ip request failed %s" % (domain, str(e)))
         ip = "unknown"
     return ip, url_plus
 
 
-def url_map_ip_analysis(urls, n_jobs = N_JOBS):
+# get ip url map
+def make_ip_url_map(urls, n_jobs=N_JOBS):
+    """
+    :param urls:
+    :param n_jobs:
+    :return: [dict]
+    """
     res = Parallel(n_jobs=n_jobs)(delayed(_core_get_ip)(url) for url in urls)
     ip_url_map = defaultdict(list)
     for ip, url in res:
         ip_url_map[ip].append(url)
     return ip_url_map
-        
 
-def url_classify_analysis(urls):
-    only_domain = set()
-    url_with_path = set()
-    url_with_param = set()
+
+# split url into only domain, url with path, url with param
+def make_url_classification(urls):
+    """
+    :param urls:
+    :return: only_domain [list], url_with_path [list], url_with_param [list]
+    """
+    only_domain, url_with_path, url_with_param = set(), set(), set()
     for url in urls:
         if len(url) <= cfg.SINGLE_REGEX_SIZE:
             continue
         worker = urlnormalize.UrlNormalize(url)
         if worker.url_is_only_domain():
-            only_domain.add(woker.get_hostname())
+            only_domain.add(worker.get_hostname())
         elif len(worker.get_params()) == 0:
-            url_with_path.add(worker.get_quote_plus_url(url))
+            url_with_path.add(worker.get_domain_path_url())
         else:
-            url_with_param.add(worker.get_quote_plus_url(url))
+            url_with_param.add(worker.get_quote_plus_url())
     return list(only_domain), list(url_with_path), list(url_with_param)
 
 
-def url_split_analysis(urls):
-    domain = set()
-    path = set()
+# split url into domain and path
+def make_url_split(urls):
+    """
+    :param urls:
+    :return: domain [list], path [list]
+    """
+    domain, path = set(), set()
     for url in urls:
         worker = urlnormalize.UrlNormalize(url)
         domain.add(worker.get_hostname())
         path.add(urllib.quote_plus(worker.get_path()))
-    return domain, path
-    
+    return list(domain), list(path)
 
-def url_path_analysis(urls):
+
+# count url path level
+def make_url_path_level_count(urls):
+    """
+    :param urls:
+    :return: res [defaultdict(list)], counter [dict]
+    """
     res = defaultdict(list)
     for url in urls:
         worker = urlnormalize.UrlNormalize(url)
         res[len(worker.get_dir_list())].append(url)
-    res_len = dict()
+    counter = dict()
     for k, v in res.iteritems():
-        res_len[k] = len(v)
-    return res, res_len
-
-
-
+        counter[k] = len(v)
+    return res, counter
