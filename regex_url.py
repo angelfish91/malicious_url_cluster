@@ -22,7 +22,7 @@ from urlnormalize import UrlNormalize
 from logger import logger
 from config import cfg
 from lib.max_substring import maxsubstring
-from io import _load_cluster_data, _load_regex_list, _dump_regex_list, _load_test_data, \
+from file_io import _load_cluster_data, _load_regex_list, _dump_regex_list, _load_test_data, \
     _dump_check_result, _load_check_result
 
 N_JOBS = cfg.GLOBAL_N_JOBS
@@ -194,7 +194,7 @@ def _regex_search_in_small_cluster(cluster):
 
 
 # extract regular expression form small clusters
-def regex_extract(input_file_path,
+def url_regex_extract(input_file_path,
                   output_file_path, dump=True):
     """
     :param input_file_path: cluster file path
@@ -263,15 +263,8 @@ def _check_performance(
         benign_res = sum([_url_regex_match(regex, _) for _ in benign_urls])
         malicious_res = sum([_url_regex_match(regex, _)
                              for _ in malicious_urls])
-        print(
-            "batch index",
-            batch_index,
-            "sample index",
-            index,
-            "FP",
-            benign_res,
-            "TP",
-            malicious_res)
+        print "batch index %d\tsample index %d\tFP %d\tTP %d\t%s" \
+              %(batch_index, index, benign_res, malicious_res, regex)
         res.append((benign_res, malicious_res))
     return res
 
@@ -390,13 +383,8 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
         for url in test_urls:
             if _url_regex_match(regex, url):
                 hit.append(url)
-        print(
-            "batch index",
-            batch_index,
-            "sample index",
-            index,
-            "hit", len(hit)
-        )
+        print "batch index %d\tsample index %d\thit url %d\t%s" \
+            %(batch_index, index, len(hit), regex)
         if len(hit) != 0:
             res[regex] = hit
     return res

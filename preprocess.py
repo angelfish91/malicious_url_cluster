@@ -54,18 +54,19 @@ def make_url_classification(urls):
     :param urls:
     :return: only_domain [list], url_with_path [list], url_with_param [list]
     """
-    only_domain, url_with_path, url_with_param = set(), set(), set()
+    only_domain, url_with_path, url_with_param = [], [], []
     for url in urls:
         if len(url) <= cfg.SINGLE_REGEX_SIZE:
+            logger.debug("url length do not meet size req %d %s" %(cfg.SINGLE_REGEX_SIZE, url))
             continue
         worker = urlnormalize.UrlNormalize(url)
         if worker.url_is_only_domain():
-            only_domain.add(worker.get_hostname())
+            only_domain.append(worker.get_hostname())
         elif len(worker.get_params()) == 0:
-            url_with_path.add(worker.get_domain_path_url())
+            url_with_path.append(worker.get_domain_path_url())
         else:
-            url_with_param.add(worker.get_quote_plus_url())
-    return list(only_domain), list(url_with_path), list(url_with_param)
+            url_with_param.append(worker.get_quote_plus_url())
+    return only_domain, url_with_path, url_with_param
 
 
 # split url into domain and path

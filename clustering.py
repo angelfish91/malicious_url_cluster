@@ -19,7 +19,7 @@ from sklearn import metrics
 from logger import logger
 from config import cfg
 from vectorize import make_vectorize
-from io import _load_vector_data, _init_dump_cluster_data, \
+from file_io import _load_vector_data, _init_dump_cluster_data, \
     _dump_cluster_data, _load_kmeans_hier_cluster_data, \
     _dump_kmeans_hier_cluster_data
 

@@ -15,7 +15,7 @@ from urlnormalize import UrlNormalize
 from logger import logger
 from config import cfg
 from lib.max_substring import maxsubstring
-from io import _load_cluster_data, _dump_regex_list, _load_regex_list, _load_test_data, \
+from file_io import _load_cluster_data, _dump_regex_list, _load_regex_list, _load_test_data, \
     _dump_check_result
 
 N_JOBS = cfg.GLOBAL_N_JOBS
@@ -218,15 +218,8 @@ def _check_performance(
         benign_res = sum([_domain_regex_match(regex, _) for _ in benign_urls])
         malicious_res = sum([_domain_regex_match(regex, _)
                              for _ in malicious_urls])
-        print(
-            "batch index",
-            batch_index,
-            "sample index",
-            index,
-            "FP",
-            benign_res,
-            "TP",
-            malicious_res)
+        print "batch index %d\tsample index %d\tFP %d\tTP %d\t%s" \
+              %(batch_index, index, benign_res, malicious_res, regex)
         res.append((benign_res, malicious_res))
     return res
 
@@ -250,6 +243,11 @@ def domain_regex_check(input_file_path,
     benign_urls = _load_test_data(test_benign_file_path)
     malicious_urls = _load_test_data(test_malicious_file_path)
 
+    malicious_urls_plus = []
+    for url in malicious_urls:
+        worker = UrlNormalize(url)
+        malicious_urls_plus.append(worker.get_hostname())
+    
     benign_urls_plus = []
     for url in benign_urls:
         worker = UrlNormalize(url)
@@ -260,7 +258,7 @@ def domain_regex_check(input_file_path,
         delayed(_check_performance)(
             regex,
             benign_urls_plus,
-            malicious_urls,
+            malicious_urls_plus,
             batch_index,
             n_jobs) for batch_index in range(n_jobs))
 
@@ -299,13 +297,8 @@ def _core_predict(regex_list, test_urls, batch_index, n_jobs):
         for url in test_urls:
             if _domain_regex_match(regex, url):
                 hit.append(url)
-        print(
-            "batch index",
-            batch_index,
-            "sample index",
-            index,
-            "hit", len(hit)
-        )
+        print "batch index %d\tsample index %d\thit domain %d\t%s" \
+            %(batch_index, index, len(hit), regex)
         if len(hit) != 0:
             res[regex] = hit
     return res

@@ -10,7 +10,7 @@ from logger import logger
 
 from config import cfg
 import urlnormalize
-from io import _dump_vector_data
+from file_io import _dump_vector_data
 
 ASCII_SIZE = cfg.ASCII_SIZE
 
