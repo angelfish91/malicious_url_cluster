@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <assert.h>
+#include <algorithm>
 #include "maxsubstring.h"
 
 
@@ -15,9 +16,21 @@ int match(std::string str1, int p1, std::string str2, int p2, int len){
     return 1;
 }
 
+
+struct fres{
+    std::string res;
+    int index;
+};
+
+bool comp(const fres &a, const fres &b){
+    return a.index < b.index;
+}
+
 std::vector<std::string> max_substring_of_strings(std::vector<std::string> raw_strings, int min_char_count){
-    std::vector<std::string> results;
+    std::vector<fres> results;
+    std::vector<std::string> fresults;
     int i, j, ans_len, ans_st, size = raw_strings.size();
+    std::string fstr = raw_strings[0];
     while(1){
         ans_len = -1;
         for (j = raw_strings[0].size(); ans_len == -1 && j > 0; j--)
@@ -37,21 +50,35 @@ std::vector<std::string> max_substring_of_strings(std::vector<std::string> raw_s
                 }
             }
         if (ans_len == -1)
-            return results;
+            break;
         else{
             if(ans_len < min_char_count)
                 break;
-            std::string res = raw_strings[0].substr(ans_st, ans_len);
-            results.push_back(res);
-            raw_strings[0] = raw_strings[0].substr(ans_st + ans_len, raw_strings[0].size()- ans_st - ans_len);
+            // store the results
+            std::string substring = raw_strings[0].substr(ans_st, ans_len);
+            fres temp_fres;
+            temp_fres.res = substring;
+            temp_fres.index = fstr.find(substring);
+            results.push_back(temp_fres);
+            // reconstruct string array to run next round
+            raw_strings[0] = raw_strings[0].substr(0, ans_st) + "\t" + 
+                raw_strings[0].substr(ans_st + ans_len, raw_strings[0].size()- ans_st - ans_len);
             for(int i = 1; i<raw_strings.size(); i++){
-                int st = raw_strings[i].find(res);
-                raw_strings[i] = raw_strings[i].substr(st + ans_len, raw_strings[i].size()- st - ans_len);
+                int st = raw_strings[i].find(substring);
+                raw_strings[i] = raw_strings[i].substr(0, st) + "\n" + 
+                    raw_strings[i].substr(st + ans_len, raw_strings[i].size()- st - ans_len);
             }
         }
     }
-    return results;
+    // sort result 
+    sort(results.begin(),results.end(),comp);
+    for(int i=0; i< results.size(); i++){
+        fresults.push_back(results[i].res);
+    }
+    return fresults;
 }
+
+
 
 
 int main(){

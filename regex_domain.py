@@ -12,17 +12,24 @@ import time
 import random
 import pandas as pd
 from collections import Counter, defaultdict
+from joblib import Parallel, delayed
 
-
+from urlnormalize import UrlNormalize
 from logger import logger
 from config import cfg
 from lib.max_substring import maxsubstring
+from regex_url import _load_cluster_data, _dump_regex_list, _load_regex_list, _load_test_data
 
 
+N_JOBS = cfg.GLOBAL_N_JOBS
+
+DOMAIN_CLUSTER_SIZE_THRESH = cfg.DOMAIN_CLUSTER_SIZE_THRESH
 DOMAIN_LEVEL_FREQUENCY_THRESH = cfg.DOMAIN_LEVEL_FREQUENCY_THRESH
 RANDOM_LEVEL_SAMPLE_ROUND = cfg.RANDOM_LEVEL_SAMPLE_ROUND
 RANDOM_LEVEL_SAMPLE_UPBOUND = cfg.RANDOM_LEVEL_SAMPLE_UPBOUND
 RANDOM_LEVEL_SAMPLE_RATIO = cfg.RANDOM_LEVEL_SAMPLE_RATIO
+
+
 
 # analysis each level of domain, keep high frequent level
 def _domain_sub_level_analysis(domains, thresh = 0.1):
@@ -90,6 +97,15 @@ def _sub_level_regex_extract(strings):
 
 
 # sub level domain match
+def _sub_level_domain_regex_match(regex, domain):
+    regex = "^" + regex + "$"
+    pattern = re.compile(regex)
+    if pattern.match(domain):
+        return True
+    return False
+
+
+# domain match
 def _domain_regex_match(regex, domain):
     pattern = re.compile(regex)
     if pattern.match(domain):
@@ -112,7 +128,7 @@ def _build_domain_level_tree(cluster):
                 sample = random.sample(sub_level_domain_list, sample_num)
                 regex = _sub_level_regex_extract(sample)
                 regex_list.append(regex)
-                score_list.append(sum([_domain_regex_match(regex, _) for _ in sub_level_domain_list]))
+                score_list.append(sum([_sub_level_domain_regex_match(regex, _) for _ in sub_level_domain_list]))
             max_score_index = score_list.index(max(score_list))
             regex = regex_list[max_score_index]
             level_tree[level].append(regex)
@@ -129,19 +145,106 @@ def _build_domain_regex(level_tree):
             regex = "|".join(level_tree[i])
             regex_list.append("(:?"+regex+")")
     regex = "\.".join(regex_list)
+    regex = "^" + regex + "$"
     logger.debug("%s" %str(level_tree))
     logger.debug(regex)
     return regex
 
 
 # extract domain regex
-def domain_regex_extract(clusters):
+def domain_regex_extract(input_file_path,
+                  output_file_path, dump = True):
+    start_time = time.time()
+    clusters = _load_cluster_data(input_file_path)
+    clusters = [_ for _ in clusters if len(_) >= DOMAIN_CLUSTER_SIZE_THRESH]
     level_tree_list = [_build_domain_level_tree(_) for _ in clusters]
     regex_list = []
     for level_tree in level_tree_list:
         regex_list.append(_build_domain_regex(level_tree))
-    return regex_list
+        
+    logger.debug("extract regex count:\t%d" % len(regex_list))
+    logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
+    if dump:
+        _dump_regex_list(regex_list, output_file_path)
+    else:
+        return regex_list
     
+
+    
+def _core_predict(regex_list, test_urls, batch_index, n_jobs):
+    """
+    split regular expression into batches for multi-process check
+    :param regex_list: regular expressions to check [list]
+    :param test_urls: white list url [list]
+    :param batch_index: batch index
+    :param n_jobs: n jobs for multi-process
+    :return:
+    """
+    # decides which batch of regular expression use to check
+    batch_size = int(len(regex_list) / n_jobs)
+    start_index = batch_index * batch_size
+    end_index = (batch_index + 1) * batch_size
+    if batch_index == n_jobs - 1:
+        end_index += n_jobs
+
+    # check batch regular expression with white list urls
+    res = dict()
+    for index, i in enumerate(regex_list[start_index: end_index]):
+        hit = []
+        for url in test_urls:
+            if _domain_regex_match(i, url):
+                hit.append(url)
+        print(
+            "batch index",
+            batch_index,
+            "sample index",
+            index,
+            "hit", len(hit)
+        )
+        if len(hit) != 0:
+            res[i] = hit
+    return res
+
+
+# predict for unknown domain
+def malicious_domain_predict(input_file_path,
+                          regex_file_path,
+                          n_jobs=N_JOBS):
+    """
+    :param input_file_path:
+    :param regex_file_path:
+    :param n_jobs:
+    :return: predict_malicious [list], predict_dict [dict]
+    """
+    regex = _load_regex_list(regex_file_path)
+    test_urls = _load_test_data(input_file_path)
+    # preprocess
+    test_urls_map = defaultdict(list)
+    for url in test_urls:
+        worker = UrlNormalize(url)
+        test_urls_map[worker.get_hostname()].append(url)    
+    
+    # predict part
+    predict_res_list = Parallel(
+        n_jobs=n_jobs)(
+        delayed(_core_predict)(
+            regex,
+            test_urls_map.keys(),
+            index,
+            n_jobs) for index in range(n_jobs))
+    # precess the result
+    predict_malicious = []
+    predict_dict = dict()
+    for predict_res in predict_res_list:
+        for k in predict_res:
+            predict_malicious.extend([test_urls_map[_] for _ in predict_res[k]])
+            predict_dict[k] = predict_res[k]
+    
+    predict_malicious = [__ for _ in predict_malicious for __ in _]
+    predict_dict_final = dict()
+    #for k, v in predict_dict.iteritems():
+    #    predict_dict_final[k] = [test_urls_map[_] for _ in v]
+    return predict_malicious, predict_dict
 
 
 
