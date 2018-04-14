@@ -29,7 +29,8 @@ RANDOM_LEVEL_SAMPLE_ROUND = cfg.RANDOM_LEVEL_SAMPLE_ROUND
 RANDOM_LEVEL_SAMPLE_UPBOUND = cfg.RANDOM_LEVEL_SAMPLE_UPBOUND
 RANDOM_LEVEL_SAMPLE_RATIO = cfg.RANDOM_LEVEL_SAMPLE_RATIO
 
-
+SMALL_CLUSTER_SIZE = cfg.SMALL_CLUSTER_SIZE
+BIG_CLUSTER_SIZE = cfg.BIG_CLUSTER_SIZE
 
 # analysis each level of domain, keep high frequent level
 def _domain_sub_level_analysis(domains, thresh = 0.1):
@@ -156,7 +157,21 @@ def domain_regex_extract(input_file_path,
                   output_file_path, dump = True):
     start_time = time.time()
     clusters = _load_cluster_data(input_file_path)
+    cluster_size = [len(_) for _ in clusters]
+    # log detail info of cluster on console
+    logger.debug("total cluster num:\t%d" % len(clusters))
+    logger.debug("big cluster:\t%d" %
+                 len([1 for i in cluster_size if i >= BIG_CLUSTER_SIZE]))
+    logger.debug("small cluster:\t%d" % len(
+        [1 for i in cluster_size if SMALL_CLUSTER_SIZE <= i < BIG_CLUSTER_SIZE]))
+    logger.debug("single one:\t%d" % len([1 for i in cluster_size if i == 1]))
+    logger.debug("cluster size detail:\t%s" % str(Counter(cluster_size)))
+    
+    
+    # filter small clusters
+    
     clusters = [_ for _ in clusters if len(_) >= DOMAIN_CLUSTER_SIZE_THRESH]
+    # build sub domain level tree
     level_tree_list = [_build_domain_level_tree(_) for _ in clusters]
     regex_list = []
     for level_tree in level_tree_list:
@@ -241,10 +256,10 @@ def malicious_domain_predict(input_file_path,
             predict_dict[k] = predict_res[k]
     
     predict_malicious = [__ for _ in predict_malicious for __ in _]
-    predict_dict_final = dict()
-    #for k, v in predict_dict.iteritems():
-    #    predict_dict_final[k] = [test_urls_map[_] for _ in v]
-    return predict_malicious, predict_dict
+    predict_dict_detail = dict()
+    for k, v in predict_dict.iteritems():
+        predict_dict_detail[k] = [test_urls_map[_] for _ in v]
+    return predict_malicious, predict_dict, predict_dict_detail
 
 
 

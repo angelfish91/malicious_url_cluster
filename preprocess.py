@@ -57,6 +57,7 @@ def url_classify_analysis(urls):
             url_with_param.add(worker.get_quote_plus_url(url))
     return list(only_domain), list(url_with_path), list(url_with_param)
 
+
 def url_split_analysis(urls):
     domain = set()
     path = set()
@@ -66,7 +67,6 @@ def url_split_analysis(urls):
         path.add(urllib.quote_plus(worker.get_path()))
     return domain, path
     
-
 
 def url_path_analysis(urls):
     res = defaultdict(list)
@@ -79,29 +79,4 @@ def url_path_analysis(urls):
     return res, res_len
 
 
-def dump_urls(urls, file_path):
-    if os.path.isfile(file_path):
-        os.remove(file_path)
-        logger.debug("OLD DATA FIND! REMOVING\t%s" % file_path)
-    try:
-        df = pd.DataFrame({"url": urls})
-        df.to_csv(file_path, index=False)
-        logger.debug("URLs has been dump\t%s" % file_path)
-    except Exception as e:
-        logger.warning("%s\tFILE DUMP ERROR %s" % (file_path, e))
-        sys.exit(0)
-        
-        
-def data_loader(filepath, csv = True, txt = False):
-    try:
-        if csv:
-            df = pd.read_csv(filepath)
-            urls = list(df.url)
-        if txt:
-            with open(filepath, "r") as fd:
-                urls = [_.strip() for _ in fd]
-        logger.debug("Malware URL Count:\t%d" %len(urls))    
-        return urls
-    except Exception as e:
-        logger.error("%s FILE OPEN ERROR! %s" %(filepath, str(e)))
-        sys.exit(0)
+

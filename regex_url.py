@@ -273,7 +273,7 @@ def _regex_search_in_small_cluster(cluster):
 
 # extract regular expression form small clusters
 def regex_extract(input_file_path,
-                  output_file_path):
+                  output_file_path, dump = True):
     """
     :param input_file_path: cluster file path
     :param output_file_path: regular expression file path
@@ -303,11 +303,14 @@ def regex_extract(input_file_path,
 
     regex_list = [_ for _ in regex_list if _ is not None]
     regex_list = list(set(regex_list))
-    _dump_regex_list(regex_list, output_file_path)
-
     logger.debug("extract regex count:\t%d" % len(regex_list))
     logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
-
+    
+    if dump:
+        _dump_regex_list(regex_list, output_file_path)
+    else:
+        return regex_list
+    
 
 # check the extracted regular expression with white list url to avoid FP
 def _check_performance(
