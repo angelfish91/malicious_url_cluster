@@ -21,7 +21,10 @@ from file_io import _load_cluster_data, _dump_regex_list, _load_regex_list, _loa
 N_JOBS = cfg.GLOBAL_N_JOBS
 
 DOMAIN_CLUSTER_SIZE_THRESH = cfg.DOMAIN_CLUSTER_SIZE_THRESH
+
 DOMAIN_LEVEL_FREQUENCY_THRESH = cfg.DOMAIN_LEVEL_FREQUENCY_THRESH
+TOP_DOMAIN_LEVEL_COUNT_THRESH = cfg.TOP_DOMAIN_LEVEL_COUNT_THRESH
+
 RANDOM_LEVEL_SAMPLE_ROUND = cfg.RANDOM_LEVEL_SAMPLE_ROUND
 RANDOM_LEVEL_SAMPLE_UPBOUND = cfg.RANDOM_LEVEL_SAMPLE_UPBOUND
 RANDOM_LEVEL_SAMPLE_RATIO = cfg.RANDOM_LEVEL_SAMPLE_RATIO
@@ -31,6 +34,21 @@ BIG_CLUSTER_SIZE = cfg.BIG_CLUSTER_SIZE
 
 # analysis each level of domain, keep high frequent level
 
+def _calc_regex_uncertainty(regex):
+    uc1 = re.compile("\{\d{1,}\,(\d{1,})\}")
+    uc1 = uc1.findall(regex)
+    if len(uc1) !=0:
+        uc1 = max([int(_) for _ in uc1])
+    else:
+        uc1 = 0
+    uc2 = re.compile("\{(\d{1,})\}")
+    uc2 = uc2.findall(regex)
+    if len(uc2) !=0:
+        uc2 = max([int(_) for _ in uc2])
+    else:
+        uc2 = 0
+    uc = max(uc1, uc2)
+    return uc
 
 def _domain_sub_level_analysis(domains):
     size = len(domains)
@@ -44,7 +62,8 @@ def _domain_sub_level_analysis(domains):
         for name, name_count in Counter(name_list).iteritems():
             if float(name_count) / float(size) > DOMAIN_LEVEL_FREQUENCY_THRESH:
                 each_level_tree[level].append(name)
-
+            elif level == 0 and name_count > TOP_DOMAIN_LEVEL_COUNT_THRESH:
+                each_level_tree[level].append(name)
     return each_level_dict, each_level_tree
 
 
@@ -93,9 +112,9 @@ def _sub_level_regex_extract(strings):
                 pattern += "\w{%d,%d}" % (size_min, size_max)
         else:
             if size_max == size_min:
-                pattern += "(.){%d}" % size_max
+                pattern += "[^\.]{%d}" % size_max
             else:
-                pattern += "(.){%d,%d}" % (size_min, size_max)
+                pattern += "[^\.]{%d,%d}" % (size_min, size_max)
         if index != len(max_substring_list):
             pattern += max_substring
         strings = fut_strings
@@ -119,8 +138,14 @@ def _domain_regex_match(regex, domain):
     return False
 
 
+def _filter_sublevel_count_domain(cluster):
+    sublevel_count = [ _ for _ in cluster if _.count(".")!= cluster[0].count(".")]
+    return cluster
+
+
 # build domain level tree
 def _build_domain_level_tree(cluster):
+    cluster = _filter_sublevel_count_domain(cluster)
     level_dict, level_tree = _domain_sub_level_analysis(cluster)
     for level in level_dict:
         if level not in level_tree.keys():
@@ -128,11 +153,16 @@ def _build_domain_level_tree(cluster):
             score_list = []
             regex_list = []
             for sample_round in range(RANDOM_LEVEL_SAMPLE_ROUND):
-                sample_num = int(len(cluster) * RANDOM_LEVEL_SAMPLE_RATIO)
+                sample_num = int(len(sub_level_domain_list) * RANDOM_LEVEL_SAMPLE_RATIO)
                 if sample_num > RANDOM_LEVEL_SAMPLE_UPBOUND:
                     sample_num = RANDOM_LEVEL_SAMPLE_UPBOUND
+                if sample_num == 0:
+                    sample_num = len(sub_level_domain_list)
                 sample = random.sample(sub_level_domain_list, sample_num)
-                regex = _sub_level_regex_extract(sample)
+                try:
+                    regex = _sub_level_regex_extract(sample)
+                except:
+                    regex = "[^\.]{%d,%d}" %(min([len(_) for _ in sample]), max([len(_) for _ in sample]))
                 regex_list.append(regex)
                 score_list.append(
                     sum([_sub_level_domain_regex_match(regex, _) for _ in sub_level_domain_list]))
@@ -181,7 +211,8 @@ def domain_regex_extract(input_file_path,
     regex_list = []
     for level_tree in level_tree_list:
         regex_list.append(_build_domain_regex(level_tree))
-
+    
+    regex_list = list(set(regex_list))
     logger.debug("extract regex count:\t%d" % len(regex_list))
     logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
     if dump:
@@ -216,10 +247,11 @@ def _check_performance(
     # check batch regular expression with white list urls
     for index, regex in enumerate(regex_list[start_index: end_index]):
         benign_res = sum([_domain_regex_match(regex, _) for _ in benign_urls])
-        malicious_res = sum([_domain_regex_match(regex, _)
-                             for _ in malicious_urls])
-        print "batch index %d\tsample index %d\tFP %d\tTP %d\t%s" \
-              %(batch_index, index, benign_res, malicious_res, regex)
+        malicious_res = sum([_domain_regex_match(regex, _) for _ in malicious_urls])
+        benign_res_set = sum([_domain_regex_match(regex, _) for _ in set(benign_urls)])
+        malicious_res_set = sum([_domain_regex_match(regex, _) for _ in set(malicious_urls)])
+        print "batch index %d\tsample index %d\tFP(url) %d\tFP(domain) %d\tTP(url) %d\tTP(domain) %d\t%s" \
+              %(batch_index, index, benign_res, benign_res_set, malicious_res, malicious_res_set, regex)
         res.append((benign_res, malicious_res))
     return res
 

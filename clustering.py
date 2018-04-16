@@ -117,6 +117,63 @@ def make_string_distance_cluster(
             _dump_cluster_data(file_path, cluster, cluster_count)
     logger.debug("string distance time cost:\t%f" % (time.time() - start_time))
 
+    
+# make fine grained cluster using string distance algorithms
+def make_string_distance_cluster_opt(
+        data,
+        n_jobs=N_JOBS,
+        metric="distance",
+        file_path=None):
+    """
+    :param data: url list[list] or k-means results file path [str]
+    :param n_jobs: multi-process
+    :param metric: algorithms used to metric the string distance
+    :param file_path: output file
+    :return: None
+    """
+    start_time = time.time()
+    # normalize input
+    assert isinstance(data, list) or isinstance(data, str)
+    if isinstance(data, list) and isinstance(data[0], str):
+        urls_list = [data]
+    elif isinstance(data, list) and isinstance(data[0], list):
+        urls_list = data
+    else:
+        urls_list = _load_kmeans_hier_cluster_data(data)
+    # sorting the list to optimize multiprocess
+    urls_list = sorted(urls_list, reverse = True, key = lambda x: len(x))
+    # url distance cluster
+    res_list = Parallel(n_jobs=n_jobs)(delayed(_core_distance_check_opt)(
+        batch_index, batch_urls) for batch_index, batch_urls in enumerate(urls_list))
+    # prepare the output file
+    _init_dump_cluster_data(file_path)
+    final_res = []
+    for res in res_list:
+        final_res += res
+    for index, single_cluster in enumerate(final_res):
+        _dump_cluster_data(file_path, single_cluster, index)
+
+def _core_distance_check_opt(batch_index, batch_urls):
+    cluster_list = []
+    cluster_done = set()
+    # for each sub cluster of k-mean results
+    for index, url in enumerate(batch_urls):
+        if index in cluster_done:
+            continue
+        cluster = [url]
+        dis_check_list = []
+        for comp_url in batch_urls[index + 1:]:
+            if comp_url not in cluster_done:
+                dis_check_list.append(_core_distance_check( url, comp_url, "distance"))
+        for dis_check_index, dis_check in enumerate(dis_check_list):
+            if dis_check:
+                cluster.append(dis_check)
+                cluster_done.add(index + 1 + dis_check_index)
+        cluster_done.add(url)
+        cluster_list.append(cluster)
+        if index%100 == 0:
+            print "batch_index %d %d/%d" %(batch_index, index, len(batch_urls))
+    return cluster_list
 
 # make hierarchical cluster
 def make_hier_cluster(
@@ -312,7 +369,7 @@ def make_hier_cluster_mass(
         for k, v in hcluster_res_dict.iteritems():
             hcluster_res_list.append(v)
     # filter hierarchical cluster result
-    _cluster_filter(hcluster_res_list)
+    hcluster_res_list = _cluster_filter(hcluster_res_list)
     if dump:
         hier_cluster_res_dict = dict()
         for index, v in enumerate(hcluster_res_list):

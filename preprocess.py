@@ -4,6 +4,7 @@
 """
 URL数据统计与预处理模块
 """
+import re
 import socket
 import urllib
 from collections import defaultdict
@@ -97,3 +98,49 @@ def make_url_path_level_count(urls):
     for k, v in res.iteritems():
         counter[k] = len(v)
     return res, counter
+
+
+
+
+def check_domain(domain):
+    """
+    检测一个字符串是否是域名
+    :param domain: 待检测的字符串
+    :return: bool，如果该字符串是域名返回True，否则返回False
+    """
+    regex_domain = re.compile('(?i)^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$')
+    if regex_domain.match(domain) is None:
+        return False
+    return True
+
+
+def check_ip(check_str):
+    """
+    检测一个字符串是否是IP
+    :param check_str: 待检测的字符串
+    :return: bool，如果该字符串是IP返回True，否则返回False
+    """
+    regex_ip = re.compile(
+        '^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$')
+    if regex_ip.match(check_str) is None:
+        return False
+    return True
+
+
+def check_url_ml(url):
+    """
+    检测一个字符串是否是url
+    :param url:
+    :return: bool，如果该字符串是url返回True，否则返回False
+    """
+    normalized_url = UrlNormalize(url)
+    domain = normalized_url.get_hostname()
+    if not check_domain(domain) and not check_ip(domain):
+        return False
+
+    url_path = normalized_url.get_path()
+    if url_path != '' and url_path.find('/') == -1:
+        return False
+
+    return True
+
