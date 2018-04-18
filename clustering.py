@@ -202,7 +202,7 @@ def make_hier_cluster(
         n_clusters = cluster_num
     # log n_clusters to console
     logger.debug(
-        "beggin to make hierarchical cluster, total_data_size: %d n_clusters: %d" %
+        "begin to make hierarchical cluster, total_data_size: %d n_clusters: %d" %
         (total_data_size, n_clusters))
     # exception
     if n_clusters == 0 or n_clusters == 1:
@@ -396,6 +396,7 @@ def _cluster_filter(cluster_res_list, filter_limit=1):
 # make ip cluster
 def make_ip_cluster(ip_url_map, limit=2):
     """
+    根据IP进行聚类，将相同IP的URL聚类在一起，将没聚成簇的URL放入簇列表的第一个列表
     :param ip_url_map:
     :param limit:
     :return: list of cluster [list]
