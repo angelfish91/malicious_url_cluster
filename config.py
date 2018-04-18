@@ -8,7 +8,7 @@ cfg.GLOBAL_N_JOBS = 8
 # url vectorize params
 cfg.ASCII_SIZE = 128
 # k-means/hierarchical cluster params
-cfg.N_CLUSTER_RATION = 2000
+cfg.PREDEFINED_CLUSTER_SIZE = 2000
 # distance metric
 cfg.EDIT_DISTANCE_THRESH_LONG = 0.3
 cfg.EDIT_DISTANCE_THRESH_SHORT = 0.2

@@ -47,13 +47,13 @@ def _calc_regex_uncertainty(regex):
     if len(uc1) != 0:
         uc1 = max([int(_) for _ in uc1])
     else:
-        uc1 = 1
+        uc1 = 0
     uc2 = re.compile("\{(\d{1,})\}")
     uc2 = uc2.findall(regex)
     if len(uc2) != 0:
         uc2 = max([int(_) for _ in uc2])
     else:
-        uc2 = 1
+        uc2 = 0
     uc = max(uc1, uc2)
     uc = len(regex) / float(uc)
     return uc
@@ -241,7 +241,7 @@ def _domain_regex_match(regex, domain):
     return False
 
 
-def _filter_sublevel_count_domain(cluster):
+def _filter_domain_by_sub_level_domain_count(cluster):
     cluster = [_ for _ in cluster if _.count(
         ".") != cluster[0].count(".")]
     return cluster
@@ -249,7 +249,7 @@ def _filter_sublevel_count_domain(cluster):
 
 # build domain level tree
 def _build_domain_level_tree(cluster):
-    cluster = _filter_sublevel_count_domain(cluster)
+    cluster = _filter_domain_by_sub_level_domain_count(cluster)
     level_dict, level_tree = _domain_sub_level_analysis(cluster)
     for level in level_dict:
         if level not in level_tree.keys() and (level == 0 or level == 1):
@@ -272,6 +272,7 @@ def _build_domain_level_tree(cluster):
                 except Exception as e:
                     regex = "[^\.]{%d,%d}" % (
                         min([len(_) for _ in sample]), max([len(_) for _ in sample]))
+                    logger.warning("regex extract fail" % str(e))
                 regex_list.append(regex)
                 score_list.append(
                     sum([_sub_level_domain_regex_match(regex, _) for _ in sub_level_domain_list]))
@@ -389,6 +390,8 @@ def domain_regex_check(input_file_path,
                        result_file_path,
                        n_jobs=N_JOBS):
     """
+    对抽取出的正则表达式进行黑白数据的性能评估
+    测试黑白数据为原始的URL
     :param input_file_path:
     :param test_benign_file_path:
     :param test_malicious_file_path:
@@ -400,7 +403,7 @@ def domain_regex_check(input_file_path,
     regex = _load_regex_list(input_file_path)
     benign_urls = _load_test_data(test_benign_file_path)
     malicious_urls = _load_test_data(test_malicious_file_path)
-
+    # 测试用数据处理
     malicious_urls_plus = []
     for url in malicious_urls:
         worker = UrlNormalize(url)
@@ -497,7 +500,7 @@ def malicious_domain_predict(input_file_path,
     """
     regex = _load_regex_list(regex_file_path)
     test_urls = _load_test_data(input_file_path)
-    # preprocess
+    # 预处理，构建了域名与原始URL的字典
     test_urls_map = defaultdict(list)
     for url in test_urls:
         worker = UrlNormalize(url)
@@ -515,13 +518,13 @@ def malicious_domain_predict(input_file_path,
     predict_malicious = []
     predict_dict = dict()
     for predict_res in predict_res_list:
-        for k in predict_res:
+        for regex in predict_res:
             predict_malicious.extend([test_urls_map[_]
-                                      for _ in predict_res[k]])
-            predict_dict[k] = predict_res[k]
+                                      for _ in predict_res[regex]])
+            predict_dict[regex] = predict_res[regex]
 
     predict_malicious = [__ for _ in predict_malicious for __ in _]
     predict_dict_detail = dict()
-    for k, v in predict_dict.iteritems():
-        predict_dict_detail[k] = [test_urls_map[_] for _ in v]
+    for regex, hit_domains in predict_dict.iteritems():
+        predict_dict_detail[regex] = [test_urls_map[_] for _ in hit_domains]
     return predict_malicious, predict_dict, predict_dict_detail

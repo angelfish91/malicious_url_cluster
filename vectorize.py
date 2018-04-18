@@ -47,7 +47,7 @@ def make_vectorize(
     :return: pandas DataFrame [pd.DataFrame]
     """
     assert isinstance(urls, list)
-
+    assert domain or path or param
     urls_domain, urls_path, urls_params = [], [], []
     urls_processed = []
     for url in urls:
@@ -59,12 +59,8 @@ def make_vectorize(
         if param:
             urls_params.append(worker.get_params())
 
-    if domain:
-        urls_processed.append(locals()["urls_domain"])
-    if path:
-        urls_processed.append(locals()["urls_path"])
-    if param:
-        urls_processed.append(locals()["urls_params"])
+    urls_processed = [urls_domain, urls_path, urls_params]
+    urls_processed = [ _ for _ in urls_processed if len(_) > 0]
 
     res = []
     for index in range(len(urls_processed)):

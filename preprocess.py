@@ -38,8 +38,9 @@ def _core_get_ip(url):
 # get ip url map
 def make_ip_url_map(urls, n_jobs=N_JOBS):
     """
-    :param urls:
-    :param n_jobs:
+    将输入的URL抽取IP地址，返回ip与url quote plus的映射的字典
+    :param: urls:
+    :param: n_jobs:
     :return: [dict]
     """
     res = Parallel(n_jobs=n_jobs)(delayed(_core_get_ip)(url) for url in urls)
@@ -52,6 +53,9 @@ def make_ip_url_map(urls, n_jobs=N_JOBS):
 # split url into only domain, url with path, url with param
 def make_url_classification(urls):
     """
+    统计输入的URL，将其分类成，仅域名的URL，域名加路径的URL，及带参数的URL
+    对于域名加路径的URL，拼装domain+path并取quote plus
+    对于带参数的URL，不做处理，仅取quote plus
     :param urls:
     :return: only_domain [list], url_with_path [list], url_with_param [list]
     """
@@ -75,6 +79,7 @@ def make_url_classification(urls):
 # split url into domain and path
 def make_url_split(urls):
     """
+    将输入的URL分成域名及路径部分
     :param urls:
     :return: domain [list], path [list]
     """
