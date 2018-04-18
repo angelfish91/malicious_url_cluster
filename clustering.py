@@ -389,7 +389,7 @@ def _cluster_filter(cluster_res_list, filter_limit=1):
     cluster_res_list = [_ for _ in cluster_res_list if isinstance(_, list)]
     cluster_lens = [len(_) for _ in cluster_res_list]
     logger.debug("before filter %s" % str(Counter(cluster_lens)))
-    cluster_res_list = [_ for _ in cluster_res_list if len(_) <= filter_limit]
+    cluster_res_list = [_ for _ in cluster_res_list if len(_) >= filter_limit]
     return cluster_res_list
 
 

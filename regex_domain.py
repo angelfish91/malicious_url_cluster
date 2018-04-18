@@ -16,21 +16,29 @@ from logger import logger
 from config import cfg
 from lib.max_substring import maxsubstring
 from file_io import _load_cluster_data, _dump_regex_list, _load_regex_list, _load_test_data, \
-    _dump_check_result
+    _dump_check_result, _load_check_result
 
 N_JOBS = cfg.GLOBAL_N_JOBS
 
 DOMAIN_CLUSTER_SIZE_THRESH = cfg.DOMAIN_CLUSTER_SIZE_THRESH
-
+# sub level domain extract
 DOMAIN_LEVEL_FREQUENCY_THRESH = cfg.DOMAIN_LEVEL_FREQUENCY_THRESH
 TOP_DOMAIN_LEVEL_COUNT_THRESH = cfg.TOP_DOMAIN_LEVEL_COUNT_THRESH
-
+SECOND_DOMAIN_LEVEL_COUNT_THRESH = cfg.SECOND_DOMAIN_LEVEL_COUNT_THRESH
+# sampling
 RANDOM_LEVEL_SAMPLE_ROUND = cfg.RANDOM_LEVEL_SAMPLE_ROUND
 RANDOM_LEVEL_SAMPLE_UPBOUND = cfg.RANDOM_LEVEL_SAMPLE_UPBOUND
 RANDOM_LEVEL_SAMPLE_RATIO = cfg.RANDOM_LEVEL_SAMPLE_RATIO
 
 SMALL_CLUSTER_SIZE = cfg.SMALL_CLUSTER_SIZE
 BIG_CLUSTER_SIZE = cfg.BIG_CLUSTER_SIZE
+
+# domain regex publish
+PUBLISH_DOMAIN_SCORE_THRESH = cfg.PUBLISH_DOMAIN_SCORE_THRESH
+PUBLISH_DOMAIN_RATIO = cfg.PUBLISH_DOMAIN_RATIO
+PUBLISH_DOMAIN_FP_THRESH = cfg.PUBLISH_DOMAIN_FP_THRESH
+PUBLISH_DOMAIN_TP_THRESH = cfg.PUBLISH_DOMAIN_TP_THRESH
+
 
 # analysis each level of domain, keep high frequent level
 
@@ -40,15 +48,106 @@ def _calc_regex_uncertainty(regex):
     if len(uc1) !=0:
         uc1 = max([int(_) for _ in uc1])
     else:
-        uc1 = 0
+        uc1 = 1
     uc2 = re.compile("\{(\d{1,})\}")
     uc2 = uc2.findall(regex)
     if len(uc2) !=0:
         uc2 = max([int(_) for _ in uc2])
     else:
-        uc2 = 0
+        uc2 = 1
     uc = max(uc1, uc2)
+    uc = len(regex)/float(uc)
     return uc
+
+def _calc_pattern_len(pattern, regex):
+    pattern = re.compile(pattern)
+    return sum([ len(_) for _ in pattern.findall(regex)])
+
+def _calc_regex_score(regex):
+    p1 = re.compile("\,(\d{1,})\}")
+    p2 = re.compile("\{(\d{1,})\}")
+    uncertain = p1.findall(regex)
+    uncertain += p2.findall(regex)
+    uncertain = sum([int(_) for _ in uncertain])
+    certain = len(regex)
+    dot = re.compile("\\.")
+    dot = dot.findall(regex)
+    certain -= len(dot)*2
+    pattern_list = ["\[A-Za-z\]\{\d{1,}\,\d{1,}\}", 
+                    "\[A-Za-z\]\{\d{1,}\}",
+                    "\\d\{\d{1,}\}",
+                    "\\d\{\d{1,}\,\d{1,}\}",
+                    "\\w\{\d{1,}\}",
+                    "\\w\{\d{1,}\,\d{1,}\}",
+                    "\[\^\\\.\]\{\d{1,}\,\d{1,}\}",
+                    "\[\^\\\.\]\{\d{1,}\}",
+                    "\(\?:",
+                    "\)",
+                    "\|",
+                    "com\\\.br",
+                    "com\\\.cn",
+                    "com\\\.uk",
+                    "com\\\.au"]
+
+    for i in pattern_list:
+        certain -= _calc_pattern_len(i, regex)
+    certain -=2
+    if certain < 0:
+        certain = 0
+    return 1 - float(uncertain)/(certain + uncertain)
+
+
+def regex_deduplicate(regex_list):
+    pattern_1 = "\{(\d{1,})\,(\d{1,})\}"
+    pattern_1 = re.compile(pattern_1)
+    pattern_2 = "\{(\d{1,})\}"
+    pattern_2 = re.compile(pattern_2)
+    done = []
+    regex_done = []
+    for n, rex1 in enumerate(regex_list):
+        if n in done:
+            continue
+        p1_res1 = pattern_1.search(rex1)
+        p2_res1 = pattern_2.search(rex1)
+        if p1_res1 is not None:
+            rex1_fount = rex1[:p1_res1.span()[0]]
+            rex1_back = rex1[p1_res1.span()[1]:]
+            rex1_str = rex1_fount + rex1_back
+            rex1_lo = int(p1_res1.groups()[0])
+            rex1_hi = int(p1_res1.groups()[1])
+        elif p2_res1 is not None:
+            rex1_fount = rex1[:p2_res1.span()[0]]
+            rex1_back = rex1[p2_res1.span()[1]:]
+            rex1_str = rex1_fount + rex1_back
+            rex1_lo = rex1_hi = int(p2_res1.groups()[0])
+        else:
+            regex_done.append(rex1)
+            continue
+        for m, rex2 in enumerate(regex_list[n+1:]):
+            p1_res2 = pattern_1.search(rex2)
+            p2_res2 = pattern_2.search(rex2)
+            if p1_res2 is not None:
+                rex2_fount = rex2[:p1_res2.span()[0]]
+                rex2_back = rex2[p1_res2.span()[1]:]
+                rex2_str = rex2_fount + rex2_back
+                if rex2_str == rex1_str:
+                    done.append(n+m+1)
+                    rex1_lo = min(int(p1_res2.groups()[0]), rex1_lo)
+                    rex1_hi = max(int(p1_res2.groups()[1]), rex1_hi)
+            elif p2_res2 is not None:
+                rex2_fount = rex2[:p2_res2.span()[0]]
+                rex2_back = rex2[p2_res2.span()[1]:]
+                rex2_str = rex2_fount + rex2_back
+                if rex2_str == rex1_str:
+                    done.append(n+m+1)
+                    rex1_lo = min(int(p2_res2.groups()[0]), rex1_lo)
+                    rex1_hi = max(int(p2_res2.groups()[0]), rex1_hi)
+        if rex1_lo != rex1_hi:
+            regex_done.append("%s{%d,%d}%s" %(rex1_fount,rex1_lo,rex1_hi,rex1_back))
+        else:
+            regex_done.append("%s{%d}%s" % (rex1_fount, rex1_lo, rex1_back))
+    return regex_done
+
 
 def _domain_sub_level_analysis(domains):
     size = len(domains)
@@ -64,6 +163,9 @@ def _domain_sub_level_analysis(domains):
                 each_level_tree[level].append(name)
             elif level == 0 and name_count > TOP_DOMAIN_LEVEL_COUNT_THRESH:
                 each_level_tree[level].append(name)
+            elif level == 1 and name_count > SECOND_DOMAIN_LEVEL_COUNT_THRESH:
+                each_level_tree[level].append(name)
+            
     return each_level_dict, each_level_tree
 
 
@@ -71,13 +173,11 @@ def _domain_sub_level_analysis(domains):
 def _sub_level_regex_extract(strings):
     max_substring_list = maxsubstring(strings, 2)
     pattern = ""
-
     for index in range(len(max_substring_list) + 1):
-        if index != len(max_substring_list):
-            max_substring = max_substring_list[index]
         sub_strings = []
         fut_strings = []
-        if 'max_substring' in locals():
+        if index != len(max_substring_list):
+            max_substring = max_substring_list[index]
             for string in strings:
                 sub_strings.append(
                     string.replace(
@@ -148,6 +248,8 @@ def _build_domain_level_tree(cluster):
     cluster = _filter_sublevel_count_domain(cluster)
     level_dict, level_tree = _domain_sub_level_analysis(cluster)
     for level in level_dict:
+        if level not in level_tree.keys() and (level == 0 or level == 1):
+            return None
         if level not in level_tree.keys():
             sub_level_domain_list = level_dict[level]
             score_list = []
@@ -188,9 +290,12 @@ def _build_domain_regex(level_tree):
     return regex
 
 
+
 # extract domain regex
 def domain_regex_extract(input_file_path,
-                         output_file_path, dump=True):
+                         output_file_path,
+                         cluster_size_thresh = DOMAIN_CLUSTER_SIZE_THRESH,
+                         dump=True):
     start_time = time.time()
     cluster_list = _load_cluster_data(input_file_path)
     cluster_size = [len(_) for _ in cluster_list]
@@ -205,15 +310,18 @@ def domain_regex_extract(input_file_path,
 
     # filter small clusters
     cluster_list = [_ for _ in cluster_list if len(
-        _) >= DOMAIN_CLUSTER_SIZE_THRESH]
+        _) >= cluster_size_thresh ]
     # build sub domain level tree
     level_tree_list = [_build_domain_level_tree(_) for _ in cluster_list]
+    level_tree_list = [ _ for _ in level_tree_list if _ is not None]
     regex_list = []
     for level_tree in level_tree_list:
         regex_list.append(_build_domain_regex(level_tree))
     
     regex_list = list(set(regex_list))
     logger.debug("extract regex count:\t%d" % len(regex_list))
+    regex_list = regex_deduplicate(regex_list)
+    logger.debug("extract regex count:\t%d\t(after deduplicate)" % len(regex_list))
     logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
     if dump:
         _dump_regex_list(regex_list, output_file_path)
@@ -303,6 +411,30 @@ def domain_regex_check(input_file_path,
 
     # dump regular expression result
     _dump_check_result(res_fp, res_tp, regex, result_file_path)
+
+    
+    
+def domain_regex_publish(result_file_path,
+                 publish_file_path,
+                 publish_score_thresh = PUBLISH_DOMAIN_SCORE_THRESH,
+                 publish_ratio = PUBLISH_DOMAIN_RATIO,
+                 publish_fp_thresh = PUBLISH_DOMAIN_FP_THRESH,
+                 publish_tp_thresh = PUBLISH_DOMAIN_TP_THRESH):
+    df = _load_check_result(result_file_path)
+    df = df.drop_duplicates("regex")
+    df["score"] = [_calc_regex_score(_) for _ in df.regex]
+    df = df.loc[df.score>publish_score_thresh]
+    df["ratio"] = (df.fp + 0.01) / (df.tp + 0.01)
+    df = df.loc[df.ratio < publish_ratio]
+    df = df.loc[df.fp <= publish_fp_thresh]
+    df = df.loc[df.tp >= publish_tp_thresh]
+    
+    regex_list_publish = list(df.regex)
+    regex_list_publish = regex_deduplicate(regex_list_publish)
+    logger.debug("regular expression publish\t%d" % len(regex_list_publish))
+    # dump regular expressions
+    _dump_regex_list(regex_list_publish, publish_file_path)
+    return df
 
 
 # support function for malicious_domain_predict

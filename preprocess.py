@@ -56,9 +56,10 @@ def make_url_classification(urls):
     :return: only_domain [list], url_with_path [list], url_with_param [list]
     """
     only_domain, url_with_path, url_with_param = [], [], []
+    counter = 0
     for url in urls:
         if len(url) <= cfg.SINGLE_REGEX_SIZE:
-            logger.debug("url length do not meet size req %d %s" %(cfg.SINGLE_REGEX_SIZE, url))
+            counter += 1
             continue
         worker = urlnormalize.UrlNormalize(url)
         if worker.url_is_only_domain():
@@ -67,6 +68,7 @@ def make_url_classification(urls):
             url_with_path.append(worker.get_domain_path_url())
         else:
             url_with_param.append(worker.get_quote_plus_url())
+    logger.debug("%d urls length do not meet size req %d" %(counter, cfg.SINGLE_REGEX_SIZE))
     return only_domain, url_with_path, url_with_param
 
 

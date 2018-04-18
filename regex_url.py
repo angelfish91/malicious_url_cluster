@@ -14,7 +14,7 @@ import re
 import time
 import random
 import pandas as pd
-from collections import Counter
+from collections import Counter, defaultdict
 from joblib import Parallel, delayed
 
 
@@ -140,6 +140,31 @@ def _regex_search_engine(cluster):
     return regex
 
 
+def _regex_search_in_big_cluster_opt(cluster):
+    """
+    :param cluster:  url string cluster [list]
+    :return: regular expression match most of the cluster
+    """
+    assert len(cluster) >= 2
+    # sampling the big cluster and maximize match count
+    random_sample_list = []
+    match_count_list = []
+    regex_list = []
+    # prepare the sample list
+    for i in range(BIG_CLUSTER_SAMPLE_ROUND):
+        random_sample = random.sample(cluster, int(len(cluster) / 2))
+        sample_regex = _regex_search_engine(random_sample)
+        if sample_regex is None:
+            continue
+        match_count_list.append(
+            sum([_url_regex_match(sample_regex, _) for _ in cluster]))
+        regex_list.append(sample_regex)
+    if len(match_count_list) == 0:
+        return None
+    max_match_count_index = match_count_list.index(max(match_count_list))
+    return regex_list[max_match_count_index]    
+
+
 # search regular expression in big cluster
 def _regex_search_in_big_cluster(cluster):
     """
@@ -223,7 +248,57 @@ def url_regex_extract(input_file_path,
         if len(cluster) >= BIG_CLUSTER_SIZE:
             regex = _regex_search_in_big_cluster(cluster)
             regex_list.append(regex)
+        if cluster_index%100 == 0:
+            logger.debug("step\t%d" % cluster_index)
 
+    regex_list = [_ for _ in regex_list if _ is not None]
+    regex_list = list(set(regex_list))
+    logger.debug("extract regex count:\t%d" % len(regex_list))
+    logger.debug("extract regex time cost:\t%f" % (time.time() - start_time))
+
+    if dump:
+        _dump_regex_list(regex_list, output_file_path)
+    else:
+        return regex_list
+    
+
+    
+def _core_url_regex_extract_opt(cluster_index, cluster):
+    if SMALL_CLUSTER_SIZE <= len(cluster) < BIG_CLUSTER_SIZE:
+        return _regex_search_in_small_cluster(cluster)
+    if len(cluster) >= BIG_CLUSTER_SIZE:
+        return _regex_search_in_big_cluster_opt(cluster)
+    if cluster_index % 200 == 0:
+        print "step: %d" %cluster_index
+    return None
+            
+    
+# extract regular expression form small clusters
+def url_regex_extract_opt(input_file_path,
+                 output_file_path, dump=True):
+    """
+    :param input_file_path: cluster file path
+    :param output_file_path: regular expression file path
+    :param dump: whether dump
+    :return: None
+    """
+    start_time = time.time()
+    cluster_list = _load_cluster_data(input_file_path)
+    cluster_size = [len(_) for _ in cluster_list]
+    # log detail info of cluster on console
+    logger.debug("total cluster num:\t%d" % len(cluster_list))
+    logger.debug("big cluster:\t%d" %
+                 len([1 for i in cluster_size if i >= BIG_CLUSTER_SIZE]))
+    logger.debug("small cluster:\t%d" % len(
+        [1 for i in cluster_size if SMALL_CLUSTER_SIZE <= i < BIG_CLUSTER_SIZE]))
+    logger.debug("single one:\t%d" % len([1 for i in cluster_size if i == 1]))
+    logger.debug("cluster size detail:\t%s" % str(Counter(cluster_size)))
+    # treat different for different size of cluster
+    regex_list = Parallel(n_jobs=N_JOBS)(
+        delayed(_core_url_regex_extract_opt)(
+            cluster_index, cluster)
+        for cluster_index, cluster in enumerate(cluster_list))
+    
     regex_list = [_ for _ in regex_list if _ is not None]
     regex_list = list(set(regex_list))
     logger.debug("extract regex count:\t%d" % len(regex_list))
@@ -313,12 +388,11 @@ def url_regex_check(input_file_path,
     _dump_check_result(res_fp, res_tp, regex, result_file_path)
 
 
-def regex_publish(result_file_path,
+def url_regex_publish(result_file_path,
                   publish_file_path,
                   publish_fp_thresh=PUBLISH_FP_THRESH,
                   publish_tp_thresh=PUBLISH_TP_THRESH,
-                  publish_ratio=PUBLISH_RATIO,
-                  publish_ratio_tp_thresh=PUBLISH_RATIO_TP_THRESH):
+                  publish_ratio=PUBLISH_RATIO):
     """
     :param result_file_path: regex fp tp result file path
     :param publish_file_path: final publish regex file path
@@ -329,19 +403,17 @@ def regex_publish(result_file_path,
     :return:
     """
     df = _load_check_result(result_file_path)
+    df["ratio"] = (df.fp + 0.01) / (df.tp + 0.01)
     # dump regular expression with 0 fp
-    dfa = df.loc[df.fp <= publish_fp_thresh]
-    dfa = dfa.loc[df.tp >= publish_tp_thresh]
-    regex_list_publish = list(dfa.regex)
-
-    df["ratio"] = (df.fp + 1) / (df.tp + 1)
-    dfb = df.loc[df.ratio < publish_ratio]
-    dfb = dfb.loc[dfb.fp <= publish_ratio_tp_thresh]
-    regex_list_publish += list(dfb.regex)
-    regex_list_publish = list(set(regex_list_publish))
+    df = df.loc[df.ratio < publish_ratio]
+    df = df.loc[df.fp <= publish_fp_thresh]
+    df = df.loc[df.tp >= publish_tp_thresh]
+    
+    regex_list_publish = list(set(df.regex))
     logger.debug("regular expression publish\t%d" % len(regex_list_publish))
     # dump regular expressions
     _dump_regex_list(regex_list_publish, publish_file_path)
+    return df
 
 
 # evaluate the regex extracted from the list
@@ -403,10 +475,10 @@ def malicious_url_predict(input_file_path,
     regex = _load_regex_list(regex_file_path)
     test_urls = _load_test_data(input_file_path)
     # preprocess
-    test_urls_map = dict()
+    test_urls_map = defaultdict(list)
     for url in test_urls:
         worker = UrlNormalize(url)
-        test_urls_map[worker.get_domain_path_url()] = url
+        test_urls_map[worker.get_domain_path_url()].append(url)
 
     # predict part
     predict_res_list = Parallel(
@@ -421,11 +493,10 @@ def malicious_url_predict(input_file_path,
     predict_dict = dict()
     for predict_res in predict_res_list:
         for key in predict_res:
-            predict_malicious.extend(predict_res[key])
+            for i in predict_res[key]:
+                predict_malicious.extend(test_urls_map[i])
             predict_dict[key] = predict_res[key]
 
-    predict_malicious = list(set([test_urls_map[_]
-                                  for _ in predict_malicious]))
     predict_dict_final = dict()
     for k, v in predict_dict.iteritems():
         predict_dict_final[k] = [test_urls_map[_] for _ in v]
