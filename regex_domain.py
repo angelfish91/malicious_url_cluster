@@ -242,9 +242,9 @@ def _domain_regex_match(regex, domain):
 
 
 def _filter_domain_by_sub_level_domain_count(cluster):
-    cluster = [_ for _ in cluster if _.count(
-        ".") != cluster[0].count(".")]
-    return cluster
+    fcluster = [_ for _ in cluster if _.count(
+        ".") == cluster[0].count(".")]
+    return fcluster
 
 
 # build domain level tree
@@ -272,7 +272,7 @@ def _build_domain_level_tree(cluster):
                 except Exception as e:
                     regex = "[^\.]{%d,%d}" % (
                         min([len(_) for _ in sample]), max([len(_) for _ in sample]))
-                    logger.warning("regex extract fail" % str(e))
+                    logger.warning("regex extract fail! %s" % str(e))
                 regex_list.append(regex)
                 score_list.append(
                     sum([_sub_level_domain_regex_match(regex, _) for _ in sub_level_domain_list]))

@@ -69,6 +69,16 @@ def _regularize_string(string):
     return string
 
 
+def _calc_regex_pscore(regex):
+    lens = len(regex)
+    sig = regex.count("%")*3
+    return sig/float(lens)
+
+def _calc_regex_ascore(regex):
+    sig = regex.count("/")
+    sig += regex.count("\.")
+    return sig
+
 # regular expression match
 def _url_regex_match(regex, url):
     """
@@ -317,9 +327,11 @@ def url_regex_check(input_file_path,
 
 def url_regex_publish(result_file_path,
                       publish_file_path,
+                      publish_pscore,
+                      publish_ascore,
+                      publish_ratio=PUBLISH_RATIO,
                       publish_fp_thresh=PUBLISH_FP_THRESH,
-                      publish_tp_thresh=PUBLISH_TP_THRESH,
-                      publish_ratio=PUBLISH_RATIO):
+                      publish_tp_thresh=PUBLISH_TP_THRESH):
     """
     :param result_file_path: regex fp tp result file path
     :param publish_file_path: final publish regex file path
@@ -329,9 +341,13 @@ def url_regex_publish(result_file_path,
     :return:
     """
     df = _load_check_result(result_file_path)
+    df["pscore"] = [_calc_regex_pscore(_) for _ in df.regex]
+    df["ascore"] = [_calc_regex_ascore(_) for _ in df.regex]
     df["ratio"] = (df.fp + 0.01) / (df.tp + 0.01)
     # dump regular expression with 0 fp
     df = df.loc[df.ratio < publish_ratio]
+    df = df.loc[df.pscore < publish_pscore]
+    df = df.loc[df.ascore >= publish_ascore]
     df = df.loc[df.fp <= publish_fp_thresh]
     df = df.loc[df.tp >= publish_tp_thresh]
 
