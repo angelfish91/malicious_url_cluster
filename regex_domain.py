@@ -88,7 +88,10 @@ def _calc_regex_score(regex):
                     "com\\\.br",
                     "com\\\.cn",
                     "com\\\.uk",
-                    "com\\\.au"]
+                    "com\\\.au",
+                    "com\\\.tw",
+                    "gov\\\.cn",
+                    "edu\\\.cn"]
 
     for i in pattern_list:
         certain -= _calc_pattern_len(i, regex)
@@ -403,6 +406,9 @@ def domain_regex_check(input_file_path,
     regex = _load_regex_list(input_file_path)
     benign_urls = _load_test_data(test_benign_file_path)
     malicious_urls = _load_test_data(test_malicious_file_path)
+    logger.debug("regex count: %d" %len(regex))
+    logger.debug("benign urls count: %d" %len(benign_urls))
+    logger.debug("malicious urls count: %d" %len(malicious_urls))
     # 测试用数据处理
     malicious_urls_plus = []
     for url in malicious_urls:
@@ -499,7 +505,11 @@ def malicious_domain_predict(input_file_path,
     :return: predict_malicious [list], predict_dict [dict], predict_dict_detail [dict]
     """
     regex = _load_regex_list(regex_file_path)
-    test_urls = _load_test_data(input_file_path)
+    assert isinstance(input_file_path, str) or isinstance(input_file_path, list)
+    if isinstance(input_file_path, str):
+        test_urls = _load_test_data(input_file_path)
+    else:
+        test_urls = input_file_path
     # 预处理，构建了域名与原始URL的字典
     test_urls_map = defaultdict(list)
     for url in test_urls:
@@ -527,4 +537,4 @@ def malicious_domain_predict(input_file_path,
     predict_dict_detail = dict()
     for regex, hit_domains in predict_dict.iteritems():
         predict_dict_detail[regex] = [test_urls_map[_] for _ in hit_domains]
-    return predict_malicious, predict_dict, predict_dict_detail
+    return list(set(predict_malicious)), predict_dict, predict_dict_detail

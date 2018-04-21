@@ -174,7 +174,7 @@ if __name__ == "__main__":
     
     root_path = "/home/sparrow/sparrow/data/sangfor/18"
     
-    for i in ["0410", "0411", "0412", "0415", "0416"]:
+    for i in ["0417", "0418", "0419"]:
         local_path = root_path + i
         file_path = os.path.join(local_path, "dumped_result.txt")
         output_filepath = os.path.join(local_path ,'dumped_result.ph.csv')

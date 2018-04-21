@@ -109,7 +109,7 @@ def make_string_distance_cluster(
     logger.debug("string distance time cost:\t%f" % (time.time() - start_time))
 
 
-def _batch_string_distance_cluster(index, urls, metric):
+def _batch_string_distance_cluster(batch_index, urls, metric):
     """
     对粗粒度聚类结果的每个簇进行进一步的字符串相似度聚类
     :param index:
@@ -136,7 +136,7 @@ def _batch_string_distance_cluster(index, urls, metric):
         cluster_done.add(url)
         cluster_list.append(cluster)
         if index % 100 == 0:
-            print "index %d %d/%d" % (index, index, len(urls))
+            print "batch %d %d/%d" % (batch_index, index, len(urls))
     return cluster_list
 
 
@@ -183,7 +183,7 @@ def make_hier_cluster(
     df_vector["labels"] = clustering.labels_
 
     # dump results dict format
-    res = dict()
+    hier_res = dict()
     for i in range(n_clusters):
         df_single_cluster = df_vector.loc[df_vector["labels"] == i]
         hier_res[i] = list(df_single_cluster.index)

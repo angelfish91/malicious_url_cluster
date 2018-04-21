@@ -424,7 +424,11 @@ def malicious_url_predict(input_file_path,
     :return: predict_malicious [list], predict_dict [dict]
     """
     regex = _load_regex_list(regex_file_path)
-    test_urls = _load_test_data(input_file_path)
+    assert isinstance(input_file_path, str) or isinstance(input_file_path, list)
+    if isinstance(input_file_path, str):
+        test_urls = _load_test_data(input_file_path)
+    else:
+        test_urls = input_file_path
     # pre-process
     test_urls_map = defaultdict(list)
     for url in test_urls:
@@ -451,4 +455,4 @@ def malicious_url_predict(input_file_path,
     predict_regex_url_map = dict()
     for regex, hit in predict_dict.iteritems():
         predict_regex_url_map[regex] = [test_urls_map[_] for _ in hit]
-    return predict_malicious_url, predict_regex_url_map
+    return list(set(predict_malicious_url)), predict_regex_url_map
