@@ -13,9 +13,38 @@ from logger import logger
 from joblib import Parallel, delayed
 from collections import Counter
 
+TIMEOUT = 60
+
+def timelimit(timeout, func, args=(), kwargs={}):
+    """ Run func with the given timeout. If func didn't finish running
+        within the timeout, raise TimeLimitExpired
+    """
+    import threading
+    class FuncThread(threading.Thread):
+        def __init__(self):
+            threading.Thread.__init__(self)
+            self.result = None
+
+        def run(self):
+            self.result = func(*args, **kwargs)
+
+        def _stop(self):
+            if self.isAlive():
+                threading.Thread._Thread__stop(self)
+
+    it = FuncThread()
+    it.start()
+    it.join(timeout)
+    if it.isAlive():
+        it._stop()
+        raise IOError
+    else:
+        return it.result
+
+
 def core_download(index, url, file_path):
     try:
-        urllib.urlretrieve(url, file_path)
+        timelimit(TIMEOUT, urllib.urlretrieve,(url, file_path))
         with open(file_path, 'rb') as f:
             data = f.read()
         sha256 = hashlib.sha256(data).hexdigest()
@@ -69,6 +98,7 @@ class ValidateWithVT(object):
             {"url": urls, "path": file_path_list, "sha256": sha256_list})
         return df
 
+    
     @staticmethod
     def calc_sha256(file_dir):
         assert isinstance(file_dir, str)
@@ -119,8 +149,12 @@ class ValidateWithVT(object):
             raise ValueError("file value error %s" % file_path)
 
         params = {'apikey': self.api_key}
-        sha256 = []
+        sha256_list = []
         for index, each_file in enumerate(file_path):
+            df, counter = self.calc_sha256(each_file)
+            sha256 = list(df.sha256)[0]
+            if sha256 in sha256_list:
+                continue
             files = {
                 'file': (
                     '{index}.exe'.format(
@@ -132,10 +166,11 @@ class ValidateWithVT(object):
                     files=files,
                     params=params)
                 json_response = response.json()
-                sha256.append(json_response['sha256'])
+                sha256_list.append(json_response['sha256'])
+                logger.debug("success to upload file to VT %s" %sha256_list[-1])
             except Exception as e:
                 logger.error("Upload file to VT error %s" % e)
-        return sha256
+        return sha256_list
 
     def validate_file_with_vt(self, sha256, verbose=False):
         assert isinstance(sha256, list) or isinstance(sha256, str)

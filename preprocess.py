@@ -13,6 +13,7 @@ from joblib import Parallel, delayed
 
 from config import cfg
 import urlnormalize
+from urlnormalize import UrlNormalize
 from logger import logger
 
 N_JOBS = cfg.GLOBAL_N_JOBS

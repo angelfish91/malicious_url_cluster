@@ -5,8 +5,11 @@ build url forest
 """
 import time
 import pandas as pd
+import tldextract
 
-REPUTATION_RATIO = 3
+from urlnormalize import UrlNormalize
+from preprocess import check_domain
+
 
 def build_domain_forest(domain_list, batch_size = 50000):
     """
@@ -79,11 +82,17 @@ def analyze_domain(safe_forest, mal_forest, domain, check=False, verbose = False
         else:
             return -1
     # count the up level domain num
-    limit = 2
-    if domain_tokens[0] in ["cn", "fr", "au", "uk", "us", "br", "pl", "tr",\
-                      "ua", "ph", "ar", "in", "mx", "rs", "ke", "ru" \
-                      "es", "vn", "pk", "id", "at", "pe", "ng"]:
-        limit = 3
+    # limit = 2
+    # if domain_tokens[0] in ["cn", "fr", "au", "uk", "us", "br", "pl", "tr",\
+    #                  "ua", "ph", "ar", "in", "mx", "rs", "ke", "ru" \
+    #                  "es", "vn", "pk", "id", "at", "pe", "ng"]:
+    #    limit = 3
+    extract_domain = tldextract.extract(domain).domain
+    if extract_domain in domain_tokens:
+        limit = domain_tokens.index(extract_domain) + 1
+    else:
+        print domain
+        return -1
     if depth>limit:
         safe_count = _analyze_domain_forest(safe_forest, domain, depth-1)
         mal_count = _analyze_domain_forest(mal_forest, domain, depth-1)
@@ -98,11 +107,15 @@ def analyze_domain(safe_forest, mal_forest, domain, check=False, verbose = False
         return -1
     
 
-def analyze_domain_batch(domain_list, safe_forest, mal_forest, verbose = False):
+def analyze_domain_batch(url_list, safe_forest, mal_forest, verbose = False):
+    domain_list = []
+    for url in url_list:
+        worker = UrlNormalize(url)
+        domain_list.append(worker.get_hostname())
     res_list = []
     cache_dict = {}
     for n, domain in enumerate(domain_list):
-        domain_split = domain.split(".", 1)[::-1]
+        domain_split = domain.split(".", 1)
         if len(domain_split) > 1  and domain_split[1] in cache_dict:
             res = cache_dict[domain_split[1]]
         else:
@@ -114,6 +127,6 @@ def analyze_domain_batch(domain_list, safe_forest, mal_forest, verbose = False):
             if n%5000 == 0:
                 print "step:%d\tuncertain:%d\tpredict_mal:%d" %(n, 
                 sum([1 for _ in res_list if _ == -1]), sum([1 for _ in res_list if _ > 1]))
-    df = pd.DataFrame({"domain": domain_list, "domain_reputation": res_list})
+    df = pd.DataFrame({"url": url_list, "domain_reputation": res_list})
     return df
 
